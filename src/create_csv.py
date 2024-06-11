@@ -47,6 +47,6 @@ for r in regions: # takes ~9m
                 temp_df = pd.read_csv(f"../data/derived/DENG{r}{y}.csv", index_col=0)
         else:
             # Append rows 
-            temp_df = pd.concat((temp_df, pd.read_csv(f"../data/derived/DENG{r}{y}.csv")), ignore_index = True)
+            temp_df = pd.concat((temp_df, pd.read_csv(f"../data/derived/DENG{r}{y}.csv", index_col=0)), ignore_index = True)
     temp_df.to_csv(f"../data/derived/DENG{r}.csv")
 
