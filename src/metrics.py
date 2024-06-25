@@ -20,12 +20,19 @@ def WIS(levels: list[float], intervals: dict, y: np.ndarray): #Y NOT PREDS
         assert lower.shape[0] == y.shape[0], "Length of lower bounds needs to match length of predictions"
         assert upper.shape[0] == y.shape[0], "Length of upper bounds needs to match length of predictions"
         under_mask, over_mask = y <= lower, y >= upper
-        under_pen = 2/(1-l)*np.mean(lower[under_mask] - y[under_mask]) if not np.all(under_mask == False) else 0
-        over_pen = 2/(1-l)*np.mean(y[over_mask] - upper[over_mask]) if not np.all(over_mask == False) else 0
+        under_pen = 2/(1-l)*np.sum(lower[under_mask] - y[under_mask])/len(y) if not np.all(under_mask == False) else 0
+        over_pen = 2/(1-l)*np.sum(y[over_mask] - upper[over_mask])/len(y) if not np.all(over_mask == False) else 0
         wis_scores[i] = np.mean(upper - lower) + under_pen + over_pen
     score = np.mean(wis_scores)
     print(f"WIS: {score}")
     return score
+
+def coverages(levels: list[float], intervals:dict, y:np.ndarray):
+    out = "Actual coverage per level |"
+    for l in levels:
+        lower, upper = intervals[l]
+        out += f" {int(100*l)}%: {np.round(100*np.mean((y >= lower) & (y <= upper)), 2)} |"
+    print(out)
 
 def PICPS(levels: list[float], intervals: dict, y: np.ndarray):
     """ PI Coverage Probability Score. Proportion of observations within interval.
@@ -93,7 +100,7 @@ def CWC(levels: list[float], minmaxes: tuple, intervals: dict, y: np.ndarray, et
         picp = np.mean((y >= lower) & (y <= upper))
         if picp < l:
             exp_scores[i] = np.exp(-eta * (picp - l))
-    score = PINAW(levels, minmaxes, intervals) + np.mean(exp_scores)
+    score = PINAW(levels, minmaxes, intervals) + np.sum(exp_scores)/len(y)
     print(f"CWC: {score}")
     return score
 
@@ -114,6 +121,7 @@ def evaluate_model(model, dataset, test_idcs, n_samples = 200, levels = [0.25, 0
     for l in levels:
         intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
     
+    coverages(levels, intervals_dict, y)
     PICPS(levels, intervals_dict, y)
     CWC(levels, (min_preds, max_preds), intervals_dict, y)
     WIS(levels, intervals_dict, y)
