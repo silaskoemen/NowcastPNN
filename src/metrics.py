@@ -42,12 +42,12 @@ def PICPS(levels: list[float], intervals: dict, y: np.ndarray):
     Lower is better, as it indicates closer matching of expected and actual coverages
     
     Args:
-    alphas [list]: list of confidence levels 
-    intervals [dict]: dictionary of upper and lower bounds per confidence level
-    preds [np.ndarray]: array of predictions
+        :alphas: [list]: list of confidence levels 
+        :intervals: [dict]: dictionary of upper and lower bounds per confidence level
+        :preds: [np.ndarray]: array of predictions
 
     Returns:
-    [float]: PICP score
+        [float]: PICP score
     """
     ci_scores = np.zeros((len(levels))) # length is known so no need for slower, variable-length list
     for i, l in enumerate(levels): # iterate over confidence levels
@@ -104,13 +104,13 @@ def CWC(levels: list[float], minmaxes: tuple, intervals: dict, y: np.ndarray, et
     print(f"CWC: {score}")
     return score
 
-def evaluate_model(model, dataset, test_idcs, n_samples = 200, levels = [0.25, 0.5, 0.75, 0.9, 0.95]):
+def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200, levels = [0.25, 0.5, 0.75, 0.9, 0.95]):
     model.train()
     model = model.to("cpu")
     # TRY BUILDING A RANDOMSUBSETSAMPLER THEN DATALOADER TO DIRECTLY LOAD ALL ELEMENTS
-    preds = np.zeros((len(test_idcs), n_samples))
-    mat, y = next(iter(DataLoader(Subset(dataset, test_idcs), batch_size=len(test_idcs), shuffle=False)))
-    mat, y = mat.to("cpu"), 1000*y.to("cpu").numpy()
+    preds = np.zeros((test_batch_size, n_samples))
+    mat, y = next(iter(test_loader))
+    mat, y = mat.to("cpu"), y.to("cpu").numpy()
     preds = np.zeros((y.shape[0], n_samples))
     for i in range(n_samples):
         preds[:, i] = model(mat).sample().numpy()
