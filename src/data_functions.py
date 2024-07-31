@@ -9,7 +9,7 @@ def reporting_data(matrix: np.ndarray, idx: int, past_units: int = 7, max_delay:
     Easiest with df and index, then just take past units and mask correctly"""
     assert future_obs < past_units, "Number of future observed units should be smaller than the number of past units included (otherwise exceeds the matrix)"
     assert future_obs >= 0, "Number of days of additional observations needs to be non-negative"
-    matrix = matrix[(idx-past_units+1):(idx+1), :].copy()
+    matrix = matrix[(idx-past_units+1):(idx+1), :].copy() # otherwise modifies inplace, changes dataset
     y = matrix.sum(axis = 1)[-(1+future_obs)]
     y_otd = matrix[-1, 0]
     # Could add y_atm as matrix[-1, 0] and return for plotting
@@ -74,6 +74,7 @@ class ReportingDataset(Dataset):
         # Compute the sum of the delays for the current date (row sum)
         label = torch.tensor(label).to(self.device)
         return tensor/self.max_val, label
+        #return tensor, label
 
 def get_dataset(weeks = True, triangle = False, past_units = 6, max_delay = 6, state = "SP", future_obs = 0, return_df = False, return_mat = False):
     """ Have to return the iterable dataset, so first read in csv file, then convert to delay-format

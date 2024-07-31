@@ -32,7 +32,7 @@ def get_loss(y_true, y_pred, loss_fct):
 def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct = "nll", device = torch.device("mps")):
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr = 0.0003, weight_decay=1e-3)
-
+    early_stopper.reset() # set counter to zero if same instance used for multiple training runs
     for e in range(num_epochs):
         batch_loss = 0.
         model.train()
