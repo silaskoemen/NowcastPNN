@@ -2,3 +2,5 @@
 /thesis_venv/
 /papers/
 /src/weights/
+/src/.RData
+/src/.Rhistory
