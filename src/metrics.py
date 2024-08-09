@@ -1,6 +1,54 @@
 import numpy as np
 import torch 
 from torch.utils.data import Subset, DataLoader
+import json
+
+def RIVM_to_dict(levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], future_obs = 14, path = "../data/model_predictions/RIVM_list.json"):
+    # Load the JSON file from the path
+    with open(path, "r") as f:
+        python_dict = json.load(f)
+    
+    ## Change list of lists to arrays
+    for date, lol in python_dict.items():
+        lol = np.array(lol).reshape((14,9,2))
+        python_dict[date] = lol
+    return python_dict
+
+def Epi_to_dict(levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], future_obs = 14, path = "../data/model_predictions/epinowcast_list.json"):
+    # Load the JSON file from the path
+    with open(path, "r") as f:
+        python_dict = json.load(f)
+    
+    ## Change list of lists to arrays
+    for date, lol in python_dict.items():
+        lol = np.array(lol).reshape((14,9,2))
+        python_dict[date] = lol
+    return python_dict
+
+def date_to_level_dict(date_dict, levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], level_idcs = {0: 0, 0.05: 1, 0.1: 2, 0.25: 3, 0.5: 4, 0.75: 5, 0.9: 6, 0.95: 7, 1: 8}):
+
+    # Initialize the new dictionary
+    level_dict = {level: [] for level in levels}
+
+    # Iterate through the original dictionary and populate the new dictionary
+    for date, array in date_dict.items():
+        for level in levels:
+            # Extract the index for the current level
+            idx = level_idcs[level]
+            # Get the lower and upper bounds (same-day, first row)
+            bounds = array[0, idx, :]
+            # Append to the corresponding list in the new dictionary
+            level_dict[level].append(bounds)
+
+    # Convert lists to NumPy arrays
+    for level in levels:
+        level_dict[level] = np.array(level_dict[level])
+        if level == 0:
+            level_dict[level] = level_dict[level][:, 0]
+        else:    
+            level_dict[level] = (level_dict[level][:, 0], level_dict[level][:, 1])
+    
+    return level_dict
 
 def IS(levels: list[float], intervals: dict, y: np.ndarray): #Y NOT PREDS
     """ Weighted Interval Score. Decomposition of sharpness and penalties for 
@@ -42,12 +90,40 @@ def WIS(levels: list[float], intervals: dict, y: np.ndarray, pred_med: np.ndarra
     print(f"WIS: {score}")
     return score
 
+def WIS_indiv(levels: list[float], intervals: dict, y, pred_med):
+    pass
+
+
+def IS_decomposed(levels: list[float], intervals: dict, y: np.ndarray):
+    """ IS score, now calculated in the formulation that yields spread, over- and underprediction. """
+
+    ## Return over-, under- and spread as well as individual things
+    is_scores = np.zeros((4, len(levels))) # underpred, spread, overpred, total
+    for i, l in enumerate(levels):
+        lower, upper = intervals[l]
+        assert lower.shape[0] == y.shape[0], "Length of lower bounds needs to match length of predictions"
+        assert upper.shape[0] == y.shape[0], "Length of upper bounds needs to match length of predictions"
+        under_mask, over_mask = y <= lower, y >= upper
+        under_pen = 2/(1-l)*np.sum(lower[under_mask] - y[under_mask])/len(y) if not np.all(under_mask == False) else 0
+        over_pen = 2/(1-l)*np.sum(y[over_mask] - upper[over_mask])/len(y) if not np.all(over_mask == False) else 0
+        is_scores[0, i] = under_pen
+        is_scores[1, i] = np.mean(upper - lower)
+        is_scores[2, i] = over_pen
+        is_scores[3, i] = np.mean(upper - lower) + under_pen + over_pen
+    is_scores = np.mean(is_scores, axis = 1)
+    print(f"IS: under = {is_scores[0]} | spread = {is_scores[1]} | over = {is_scores[2]} | total = {is_scores[3]}")
+    return is_scores
+
 def coverages(levels: list[float], intervals:dict, y:np.ndarray):
     out = "Actual coverage per level |"
+    return_dict = {}
     for l in levels:
         lower, upper = intervals[l]
-        out += f" {int(100*l)}%: {np.round(100*np.mean((y >= lower) & (y <= upper)), 2)} |"
+        cov = np.mean((y >= lower) & (y <= upper))
+        return_dict[l] = cov
+        out += f" {int(100*l)}%: {np.round(100*cov, 2)} |"
     print(out)
+    return return_dict
 
 def PICA(levels: list[float], intervals: dict, y: np.ndarray):
     """ PI Coverage Accuracy. Proportion of observations within interval.
@@ -129,6 +205,7 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     mat, y = mat.to("cpu"), y.to("cpu").numpy()
     preds = np.zeros((y.shape[0], n_samples))
     for i in range(n_samples):
+        #preds[:, i] = np.squeeze(model(mat).sample().numpy())
         preds[:, i] = model(mat).sample().numpy()
     min_preds, max_preds = np.min(preds, axis=1), np.max(preds, axis=1)
     pred_median = np.quantile(preds, 0.5, axis=1)
@@ -144,5 +221,37 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     CWC(levels, (min_preds, max_preds), intervals_dict, y)
     WIS(levels, intervals_dict, y, pred_med=pred_median)
     IS(levels, intervals_dict, y)
+    IS_decomposed(levels, intervals_dict, y)
 
-    
+def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], return_y = False, return_coverages = True, return_is_decomposed = True):
+    _, y = next(iter(test_loader))
+    y = y.to("cpu").numpy()
+
+    min_preds, max_preds = intervals_dict[1] # 100% PI, meaning max and min
+    pred_median = intervals_dict[0] # 0% PI, meaning median
+
+    cov_dict, wis_dict = {}, {}
+
+
+    cov_dict = coverages(levels, intervals_dict, y)
+    PICA(levels, intervals_dict, y)
+    CWC(levels, (min_preds, max_preds), intervals_dict, y)
+    WIS(levels, intervals_dict, y, pred_med=pred_median)
+    IS(levels, intervals_dict, y)
+    is_decomp = IS_decomposed(levels, intervals_dict, y)
+
+    ## Ideally should return coverages as dictionary, and WIS as decomposition (array is fine)
+    if return_y:
+        if return_coverages and return_is_decomposed:
+            return cov_dict, is_decomp, y
+        elif return_is_decomposed:
+            return is_decomp, y
+        elif return_coverages:
+            return cov_dict, y
+    else:
+        if return_coverages and return_is_decomposed:
+            return cov_dict, is_decomp
+        elif return_is_decomposed:
+            return is_decomp
+        elif return_coverages:
+            return cov_dict
