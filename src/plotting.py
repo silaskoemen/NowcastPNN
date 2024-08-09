@@ -4,11 +4,14 @@ import matplotlib.pyplot as plt
 from scipy import stats
 import torch
 import pandas as pd
-#plt.rcParams['font.family'] = "cmr10"
-plt.rcParams['font.serif'] = "Computer Modern"
+plt.rcParams['font.family'] = "Times New Roman" #"cmr10"
+plt.rcParams.update({"axes.labelsize" : "large"}) # 'font.size': 11, 
+#plt.rcParams['font.serif'] = "Computer Modern"
 
 def test_plot():
-    plt.plot([1, 5.4, 4, 9.2, 19])
+    plt.figure(figsize=(9, 6))
+    plt.plot(range(10), range(20, 30))
+    plt.xlabel("This is a sample x-label to see how it looks if it's longer")
     plt.show()
 
 ## Make plot over entire dataset for desired confidence level
@@ -20,7 +23,7 @@ def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], 
     mat, y = mat.to("cpu"), y.to("cpu").numpy()
     preds = np.zeros((y.shape[0], n_samples))
     for i in range(n_samples):
-        preds[:, i] = model(mat).sample().numpy()
+        preds[:, i] = np.squeeze(model(mat).sample().numpy())
     preds_mean = np.quantile(preds, 0.5, axis=1)#np.mean(preds, axis = 1)
     #preds_mean = torch.mode(preds, dim=1).values#.to_numpy()#np.mean(preds, axis = 1)#stats.mode(preds, axis=0)[0]
     
@@ -54,6 +57,96 @@ def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], 
     else:
         plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}")
     plt.show()
+
+def plot_coverages(epi_coverages, rivm_coverages, pnn_coverages, levels = [0.5, 0.95]):
+    assert len(levels) == 2, "Only two distinct levels supported"
+    assert all(ele in [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1] for ele in levels), "Levels must be in levels used: [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]"
+    # The models and their corresponding coverages
+    models = ["Epinowcast", "RIVM", "NowcastPNN"]
+    coverages_lower =  [epi_coverages[min(levels)], rivm_coverages[min(levels)], pnn_coverages[min(levels)]]
+    coverages_higher = [epi_coverages[max(levels)], rivm_coverages[max(levels)], pnn_coverages[max(levels)]]
+
+    y_pos = np.arange(len(models))
+
+    fig, ax = plt.subplots(figsize=(7.5, 3.5))  # Reduced height
+
+    colors_50 = ['dodgerblue', 'black', 'crimson']
+    colors_95 = ['dodgerblue', 'black', 'crimson']
+
+    ax.barh(y_pos, coverages_lower, color=colors_50, alpha=1.0, height=0.35, label=f'{100*min(levels)}% Coverage', zorder=3)
+    ax.barh(y_pos, coverages_higher, color=colors_95, alpha=0.5, height=0.35, label=f'{100*max(levels)}% Coverage', zorder=2)
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(models, fontsize="large")
+    ax.set_xlabel('Coverage', fontsize="large")
+    ax.set_xticks([0, 0.25, 0.5, 0.75, 1])
+
+    ## Add minor ticks (for grid) but do not show them (empty labels)
+    ax.set_xticks(np.arange(0, 1.01, 0.125), minor=True)
+    ax.tick_params(which='minor', length=0)
+
+    ## Add dashed lines at 0.5 and 0.95 with high zorder to appear above grid lines
+    ax.axvline(0.5, color='black', linestyle='--', linewidth=1.5, zorder=4)
+    ax.axvline(0.95, color='black', linestyle='--', linewidth=1, zorder=4)
+
+    ## Add grid for both major and minor ticks with lower zorder to be below the bars
+    ax.grid(True, alpha=0.5, zorder=1)
+    ax.grid(True, which='minor', alpha=0.5, zorder=1)
+
+    ## Move the legend outside the plot
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_is_decomposition(epi_scores, rivm_scores, pnn_scores):
+    models = ["Epinowcast", "RIVM", "NowcastPNN"]
+    
+    # Colors for each component
+    colors_under = ['dodgerblue', 'black', 'crimson']
+    colors_spread = ['aliceblue', 'lightgrey', 'mistyrose']  # almost white, a very bright hue of the original color
+    colors_over = ['dodgerblue', 'black', 'crimson']
+
+    # Position for each bar on y-axis
+    y_pos = np.arange(len(models))
+
+    # Set up the figure and axis
+    fig, ax = plt.subplots(figsize=(7.5, 3.5))
+
+    # Plot each component of the WIS score
+    for i, scores in enumerate([epi_scores, rivm_scores, pnn_scores]):
+        ax.barh(y_pos[i], scores[0], color=colors_under[i], height=0.35, label='Underprediction' if i == 1 else "", zorder=3)
+        ax.barh(y_pos[i], scores[1], left=scores[0], color=colors_spread[i], height=0.35, label='Spread' if i == 1 else "", zorder=3)
+        ax.barh(y_pos[i], scores[2], left=scores[0] + scores[1], color=colors_over[i], height=0.35, label='Overprediction' if i == 1 else "", zorder=3, alpha = 0.5)
+
+    # Set the y-ticks with the model names
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(models, fontsize="large")
+
+    # Set the x-axis labels
+    ax.set_xlabel('IS Decomposition', fontsize="large")
+
+    # Add grid for both major and minor ticks with lower zorder to be below the bars
+    ax.grid(True, alpha=0.5, zorder=1)
+
+    # Move the legend outside the plot
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
+    
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_wis(epi_scores, rivm_scores, pnn_scores):
+    """ Plot vertical bar charts to visualize the WIS scores achieved by all models. """
+
+
+    pass
+
+def plot_pica(epi_scores, rivm_scores, pnn_scores):
+    """ Plot vertical bar charts to visualize the PI Coverage Accuracies scores achieved by all models. """
+
+    
+    pass
 
 
 def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int = 30, future_units = 0, start_date: str = "2013-01-01", weeks = False) -> None:

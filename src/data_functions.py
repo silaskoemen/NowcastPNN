@@ -54,7 +54,7 @@ class ReportingDataset(Dataset):
 
     def __len__(self):
         # Calculate the number of days between 60 days after start_date and 46 days before end_date
-        return len(self.df) - (self.past_units-1) - self.max_delay
+        return len(self.df) - (self.past_units-1) - (self.max_delay-1)
     
     def __getitem__(self, idx):
         # Calculate the date for the current iteration, considering the adjusted range
