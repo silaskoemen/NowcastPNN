@@ -8,6 +8,9 @@ plt.rcParams['font.family'] = "Times New Roman" #"cmr10"
 plt.rcParams.update({"axes.labelsize" : "large"}) # 'font.size': 11, 
 #plt.rcParams['font.serif'] = "Computer Modern"
 
+models = ["Epinowcast", "RIVM", "NowcastPNN"]
+colors = ['dodgerblue', 'black', 'crimson']
+
 def test_plot():
     plt.figure(figsize=(9, 6))
     plt.plot(range(10), range(20, 30))
@@ -62,7 +65,7 @@ def plot_coverages(epi_coverages, rivm_coverages, pnn_coverages, levels = [0.5, 
     assert len(levels) == 2, "Only two distinct levels supported"
     assert all(ele in [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1] for ele in levels), "Levels must be in levels used: [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]"
     # The models and their corresponding coverages
-    models = ["Epinowcast", "RIVM", "NowcastPNN"]
+    #models = ["Epinowcast", "RIVM", "NowcastPNN"]
     coverages_lower =  [epi_coverages[min(levels)], rivm_coverages[min(levels)], pnn_coverages[min(levels)]]
     coverages_higher = [epi_coverages[max(levels)], rivm_coverages[max(levels)], pnn_coverages[max(levels)]]
 
@@ -96,11 +99,12 @@ def plot_coverages(epi_coverages, rivm_coverages, pnn_coverages, levels = [0.5, 
     ## Move the legend outside the plot
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
     plt.tight_layout()
+    plt.savefig(f"../outputs/figures/coverages")
     plt.show()
 
 
 def plot_is_decomposition(epi_scores, rivm_scores, pnn_scores):
-    models = ["Epinowcast", "RIVM", "NowcastPNN"]
+    #models = ["Epinowcast", "RIVM", "NowcastPNN"]
     
     # Colors for each component
     colors_under = ['dodgerblue', 'black', 'crimson']
@@ -116,8 +120,8 @@ def plot_is_decomposition(epi_scores, rivm_scores, pnn_scores):
     # Plot each component of the WIS score
     for i, scores in enumerate([epi_scores, rivm_scores, pnn_scores]):
         ax.barh(y_pos[i], scores[0], color=colors_under[i], height=0.35, label='Underprediction' if i == 1 else "", zorder=3)
-        ax.barh(y_pos[i], scores[1], left=scores[0], color=colors_spread[i], height=0.35, label='Spread' if i == 1 else "", zorder=3)
-        ax.barh(y_pos[i], scores[2], left=scores[0] + scores[1], color=colors_over[i], height=0.35, label='Overprediction' if i == 1 else "", zorder=3, alpha = 0.5)
+        ax.barh(y_pos[i], scores[1], left=scores[0], color=colors_over[i], height=0.35, label='Spread' if i == 1 else "", zorder=3, alpha = 0.25) # colors_spread
+        ax.barh(y_pos[i], scores[2], left=scores[0] + scores[1], color=colors_over[i], height=0.35, label='Overprediction' if i == 1 else "", zorder=3, alpha = 0.66)
 
     # Set the y-ticks with the model names
     ax.set_yticks(y_pos)
@@ -133,20 +137,61 @@ def plot_is_decomposition(epi_scores, rivm_scores, pnn_scores):
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
     
     plt.tight_layout()
+    plt.savefig(f"../outputs/figures/is_decompositions")
     plt.show()
 
 
 def plot_wis(epi_scores, rivm_scores, pnn_scores):
     """ Plot vertical bar charts to visualize the WIS scores achieved by all models. """
+    scores  = [epi_scores, rivm_scores, pnn_scores]
+    # Positions for the bars on the x-axis
+    x_pos = np.arange(len(models))
 
+    # Set up the figure and axis
+    fig, ax = plt.subplots(figsize=(5, 3.5))
 
-    pass
+    # Plot vertical bars
+    ax.bar(x_pos, scores, color=colors, zorder = 2, width=0.66)
+
+    # Set the x-ticks with the model names
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(models, fontsize="large")
+
+    # Add grid lines
+    ax.grid(True, axis='y', alpha=0.2, zorder=1)
+
+    # Display the plot
+    plt.tight_layout()
+    plt.savefig(f"../outputs/figures/wis")
+    plt.show()
 
 def plot_pica(epi_scores, rivm_scores, pnn_scores):
     """ Plot vertical bar charts to visualize the PI Coverage Accuracies scores achieved by all models. """
+    """ Plot vertical bar charts to visualize the WIS scores achieved by all models. """
+    scores  = [epi_scores, rivm_scores, pnn_scores]
+    # Positions for the bars on the x-axis
+    x_pos = np.arange(len(models))
 
-    
-    pass
+    # Set up the figure and axis
+    fig, ax = plt.subplots(figsize=(5, 3.5))
+
+    # Plot vertical bars
+    ax.bar(x_pos, scores, color=colors, zorder = 2, width = 0.66)
+
+    # Set the x-ticks with the model names
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(models, fontsize="large")
+
+    ax.set_ylim((0, 0.1))
+
+    # Add grid lines
+    ax.grid(True, axis='y', alpha=0.2, zorder=1)
+
+
+    # Display the plot
+    plt.tight_layout()
+    plt.savefig(f"../outputs/figures/pica")
+    plt.show()
 
 
 def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int = 30, future_units = 0, start_date: str = "2013-01-01", weeks = False) -> None:

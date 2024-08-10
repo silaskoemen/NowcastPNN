@@ -234,16 +234,17 @@ def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.
 
 
     cov_dict = coverages(levels, intervals_dict, y)
-    PICA(levels, intervals_dict, y)
-    CWC(levels, (min_preds, max_preds), intervals_dict, y)
-    WIS(levels, intervals_dict, y, pred_med=pred_median)
+    pica = PICA(levels, intervals_dict, y)
+    cwc = CWC(levels, (min_preds, max_preds), intervals_dict, y)
+    wis = WIS(levels, intervals_dict, y, pred_med=pred_median)
     IS(levels, intervals_dict, y)
     is_decomp = IS_decomposed(levels, intervals_dict, y)
 
-    ## Ideally should return coverages as dictionary, and WIS as decomposition (array is fine)
+    ## Think about having dictionary, where each element is set
+    return cov_dict, pica, cwc, wis, is_decomp
     if return_y:
         if return_coverages and return_is_decomposed:
-            return cov_dict, is_decomp, y
+            return cov_dict, pica, cwc, wis, is_decomp, y
         elif return_is_decomposed:
             return is_decomp, y
         elif return_coverages:
