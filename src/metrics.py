@@ -2,6 +2,7 @@ import numpy as np
 import torch 
 from torch.utils.data import Subset, DataLoader
 import json
+import pickle
 
 def RIVM_to_dict(levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], future_obs = 14, path = "../data/model_predictions/RIVM_list.json"):
     # Load the JSON file from the path
@@ -204,6 +205,7 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     mat, y = next(iter(test_loader))
     mat, y = mat.to("cpu"), y.to("cpu").numpy()
     preds = np.zeros((y.shape[0], n_samples))
+    print(len(y))
     for i in range(n_samples):
         #preds[:, i] = np.squeeze(model(mat).sample().numpy())
         preds[:, i] = model(mat).sample().numpy()
@@ -222,6 +224,30 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     WIS(levels, intervals_dict, y, pred_med=pred_median)
     IS(levels, intervals_dict, y)
     IS_decomposed(levels, intervals_dict, y)
+
+def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save = False, recent=False):
+    model.train()
+    model = model.to("cpu")
+    mat, y = next(iter(test_loader))
+    mat, y = mat.to("cpu"), y.to("cpu").numpy()
+    preds = np.zeros((y.shape[0], n_samples))
+    for i in range(n_samples):
+        #preds[:, i] = np.squeeze(model(mat).sample().numpy())
+        preds[:, i] = model(mat).sample().numpy()
+    min_preds, max_preds = np.min(preds, axis=1), np.max(preds, axis=1)
+    pred_median = np.quantile(preds, 0.5, axis=1)
+
+    intervals_dict = {}
+    for l in levels:
+        intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
+    intervals_dict[0] = pred_median
+    intervals_dict[1] = (min_preds, max_preds)
+
+    if save:
+        with open(f'../data/model_predictions/nowcast_pnn_dict{"_recent" if recent else ""}.pkl', 'wb') as f:
+            pickle.dump(intervals_dict, f)
+
+    return intervals_dict
 
 def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], return_y = False, return_coverages = True, return_is_decomposed = True):
     _, y = next(iter(test_loader))
@@ -242,7 +268,7 @@ def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.
 
     ## Think about having dictionary, where each element is set
     return cov_dict, pica, cwc, wis, is_decomp
-    if return_y:
+    """if return_y:
         if return_coverages and return_is_decomposed:
             return cov_dict, pica, cwc, wis, is_decomp, y
         elif return_is_decomposed:
@@ -255,4 +281,4 @@ def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.
         elif return_is_decomposed:
             return is_decomp
         elif return_coverages:
-            return cov_dict
+            return cov_dict"""

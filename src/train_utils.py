@@ -126,3 +126,43 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         model.train()
         #if e % 50 == 0 or e == num_epochs-1:
         print(f"Epoch {e+1} - Train loss: {batch_loss:.3} - Val loss: {test_batch_loss:.3} - ES count: {early_stopper.get_count()}")
+
+
+
+class EarlyStopper:
+    """ Class implementing early stopping. Theoretically, PyTorch lightning could be used, but this might be more rubust.
+    
+    As seen e.g. in https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch and adapted to include 
+    restoration of best weights.
+    """
+    def __init__(self, past_units, max_delay, weeks, future_obs, state, triangle, patience = 30):
+        self.patience = patience
+        self.counter = 0
+        self.min_loss = float('inf')
+        self.past_units = past_units
+        self.max_delay = max_delay
+        self.weeks = weeks
+        self.future_obs = future_obs
+        self.state = state
+        self.triangle = triangle
+
+    def early_stop(self, val_loss, model):
+        if val_loss < self.min_loss:
+            self.min_loss = val_loss
+            self.counter = 0
+            ## Save best weights
+            torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-{('tri' if self.triangle else 'sum')}-fut{self.future_obs}-{self.state}")
+        elif val_loss > self.min_loss:
+            self.counter += 1
+            if self.counter >= self.patience:
+                return True
+        return False
+    
+    def get_count(self):
+        return self.counter
+    
+    def get_patience(self):
+        return self.patience
+    
+    def reset(self):
+        self.counter = 0

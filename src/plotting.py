@@ -1,6 +1,7 @@
 import numpy as np
 from torch.utils.data import Subset, DataLoader
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 from scipy import stats
 import torch
 import pandas as pd
@@ -55,8 +56,12 @@ def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], 
     plt.ylim(bottom=0)
     plt.xlim(left=0)
     if xlims is not None:
-        plt.xlim(xlims)
-        plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_subset_{xlims[0]}_{xlims[1]}")
+        if random_split:
+            plt.xlim(xlims)
+            plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_subset_{xlims[0]}_{xlims[1]}")
+        else:
+            plt.xlim(2133, 2844)
+            plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_recent")
     else:
         plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}")
     plt.show()
@@ -294,3 +299,17 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
     plt.ylabel("Number of cases")
     plt.savefig(f"../outputs/figures/past_correction_{'week' if weeks else 'day'}_{idx_current}_fut{future_obs}")
     plt.show()
+
+def days_to_date(start_date, num_days, past_units = 1):
+    """
+    Converts number of days since start_date to the corresponding date.
+    
+    Args:
+    start_date (str): The start date in 'YYYY-MM-DD' format.
+    num_days (int): Number of days from the start date.
+    
+    Returns:
+    datetime: The corresponding date.
+    """
+    start_date = datetime.strptime(start_date, '%Y-%m-%d')
+    return start_date + timedelta(days=num_days+past_units-1)
