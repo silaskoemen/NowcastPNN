@@ -106,25 +106,6 @@ for(td in test_dates) {
 #plotEpicurve(data = rep.data)
 #plotTrapezoid(data = rep.data)
 
-ncst <- nowcast.list$nowcast
-ncst[ncst$Date == "2015-03-16", ]
-
-## Aggregate all values to same level of date and then bounds per CI dataframe
-aggregate_samples <- function(agg_list, obs, levels){
-  if(agg_list == NULL) {
-    agg_df = data.frame(matrix(ncol = 3, nrow = 0))
-    colnames(agg_df)
-  }
-  d <- hash()
-  for(l in levels) {
-    # Find two values corr. to level, add to hashmap (dict)
-    d[['l']] <- c(obs[paste0((1-l)/2)], obs[paste0((1+l)/2)])
-  }
-  
-  if(agg_df == NULL) {
-    agg_df = data.frame()
-  }
-}
 
 #install.packages("jsonlite")
 library(jsonlite)

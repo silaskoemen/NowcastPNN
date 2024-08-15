@@ -137,7 +137,7 @@ for(td in test_dates) {
   ## Use samples for quantiles, min, max (width) and all criteria
   
   for(p in 0:13) {
-    temp_date = format(as.Date(td) - p, format="%Y-%m-%d")
+    temp_date = as.Date(td) - p
     #print(paste("Temp date to investigate", temp_date))
     target_samples = samples[samples$reference_date == temp_date]$sample
     
@@ -155,7 +155,11 @@ for(td in test_dates) {
   progress_counter = progress_counter+1
 }
 
+library(jsonlite)
 
+# Convert the named list to JSON and save to a file
+json_epinc <- toJSON(agg_list_epinc, pretty = TRUE)
+write(json_epinc, file = "data/model_predictions/epinowcast_list.json")
 
 
 ######### SINGLE OBSERVATION TEST RUN #########
