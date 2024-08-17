@@ -115,11 +115,19 @@ def IS_decomposed(levels: list[float], intervals: dict, y: np.ndarray):
     print(f"IS: under = {is_scores[0]} | spread = {is_scores[1]} | over = {is_scores[2]} | total = {is_scores[3]}")
     return is_scores
 
+import matplotlib.pyplot as plt
+
 def coverages(levels: list[float], intervals:dict, y:np.ndarray):
     out = "Actual coverage per level |"
     return_dict = {}
     for l in levels:
+        #print(f"------------- Level {l} -------------")
         lower, upper = intervals[l]
+        """plt.plot(range(len(y)), lower, label="Lower bound", c = "darkred")
+        plt.plot(range(len(y)), upper, label="Upper bound", c = "crimson")
+        plt.plot(y, label = "True count", c = "black")
+        plt.legend()
+        plt.show()"""
         cov = np.mean((y >= lower) & (y <= upper))
         return_dict[l] = cov
         out += f" {int(100*l)}%: {np.round(100*cov, 2)} |"
@@ -225,7 +233,49 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     IS(levels, intervals_dict, y)
     IS_decomposed(levels, intervals_dict, y)
 
-def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save = False, recent=False):
+def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save = False, random_split=False, dow = False):
+    mat, y = next(iter(test_loader))
+    if dow:
+        mat, dow_val = mat
+        mat, dow_val, y = mat.to("cpu"), dow_val.to("cpu"), y.to("cpu").numpy()
+    else:
+        mat, y = mat.to("cpu"), y.to("cpu").numpy()
+    model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std.
+    model.drop1.train() # keeps dropout layers active
+    model.drop2.train()
+    model = model.to("cpu")
+    preds = np.zeros((y.shape[0], n_samples))
+    for i in range(n_samples):
+        #preds[:, i] = np.squeeze(model(mat).sample().numpy())
+        preds[:, i] = model(mat).sample().numpy() if not dow else model(mat, dow_val).sample().numpy()
+    min_preds, max_preds = np.min(preds, axis=1), np.max(preds, axis=1)
+    pred_median = np.quantile(preds, 0.5, axis=1)
+    #print(pred_median)
+    intervals_dict = {}
+    for l in levels:
+        intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
+    intervals_dict[0] = pred_median
+    intervals_dict[1] = (min_preds, max_preds)
+
+    if save:
+        with open(f'../data/model_predictions/nowcast_pnn_dict{"_recent" if not random_split else ""}{"_dow" if dow else ""}.pkl', 'wb') as f:
+            pickle.dump(intervals_dict, f)
+
+    return intervals_dict
+
+def form_predictions(temp_counts, y, future_obs):
+    """ From entire predictions """
+    # Set to y where available, else is temp_counts, then sum
+    result = np.zeros((temp_counts.shape))
+    result[:, :(future_obs + 1)] = y[:, :(future_obs+1)]
+    result[:, (future_obs+1):] = temp_counts[:, (future_obs+1):]
+    result = result.sum(axis=1)
+    return result
+
+
+def pnn_PIs_indiv(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], future_obs = 0, save = False, random_split=False):
+    """ Test_loader now has entire vector of y, so needs future_obs too to know how many can be set as fixed.
+    """
     model.train()
     model = model.to("cpu")
     mat, y = next(iter(test_loader))
@@ -233,7 +283,8 @@ def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5,
     preds = np.zeros((y.shape[0], n_samples))
     for i in range(n_samples):
         #preds[:, i] = np.squeeze(model(mat).sample().numpy())
-        preds[:, i] = model(mat).sample().numpy()
+        temp_counts = model(mat).sample().numpy()
+        preds[:, i] = form_predictions(temp_counts, y, future_obs)
     min_preds, max_preds = np.min(preds, axis=1), np.max(preds, axis=1)
     pred_median = np.quantile(preds, 0.5, axis=1)
 
@@ -244,14 +295,16 @@ def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5,
     intervals_dict[1] = (min_preds, max_preds)
 
     if save:
-        with open(f'../data/model_predictions/nowcast_pnn_dict{"_recent" if recent else ""}.pkl', 'wb') as f:
+        with open(f'../data/model_predictions/nowcast_pnn_dict{"_recent" if not random_split else ""}_indiv.pkl', 'wb') as f:
             pickle.dump(intervals_dict, f)
 
     return intervals_dict
 
-def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], return_y = False, return_coverages = True, return_is_decomposed = True):
+def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], return_y = False, return_coverages = True, return_is_decomposed = True, total = True):
     _, y = next(iter(test_loader))
     y = y.to("cpu").numpy()
+    if not total:
+        y = y.sum(axis = 1)
 
     min_preds, max_preds = intervals_dict[1] # 100% PI, meaning max and min
     pred_median = intervals_dict[0] # 0% PI, meaning median

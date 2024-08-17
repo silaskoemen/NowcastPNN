@@ -2,15 +2,19 @@ import numpy as np
 import pandas as pd
 from epiweeks import Week, Year
 from datetime import datetime
+from plotting import days_to_date
 
-def reporting_data(matrix: np.ndarray, idx: int, past_units: int = 7, max_delay: int = 6, future_obs: int = 0): # future units for future to correct positions
+def reporting_data(matrix: np.ndarray, idx: int, past_units: int = 7, max_delay: int = 6, future_obs: int = 0, vector_y = False, dow = False): # future units for future to correct positions
     """ Function for returning reporting data
     
     Easiest with df and index, then just take past units and mask correctly"""
     assert future_obs < past_units, "Number of future observed units should be smaller than the number of past units included (otherwise exceeds the matrix)"
     assert future_obs >= 0, "Number of days of additional observations needs to be non-negative"
     matrix = matrix[(idx-past_units+1):(idx+1), :].copy() # otherwise modifies inplace, changes dataset
-    y = matrix.sum(axis = 1)[-(1+future_obs)]
+    if vector_y:
+        y = matrix[-(1+future_obs), :].copy()
+    else:
+        y = matrix.sum(axis = 1)[-(1+future_obs)].copy()
     y_otd = matrix[-1, 0]
     # Could add y_atm as matrix[-1, 0] and return for plotting
     mask = np.zeros((past_units, max_delay), dtype=bool)
@@ -19,6 +23,8 @@ def reporting_data(matrix: np.ndarray, idx: int, past_units: int = 7, max_delay:
             if p + d >= max_delay:
                 mask[p+(past_units-max_delay), d] = True
     matrix[mask] = 0.
+    if dow:
+        return matrix, days_to_date("2013-01-01", idx, past_units).weekday(), y
     return matrix, y
 
 import torch
@@ -27,7 +33,7 @@ from torch.utils.data import Dataset
 class ReportingDataset(Dataset):
     ## Theoretically, should contain covariates for date too, return tuple of matrix and covariates as well as label at each iteration
 
-    def __init__(self, df, max_val, triangle = False, past_units=6, max_delay=6, future_obs = 0, device = "mps"):
+    def __init__(self, df, max_val, triangle = False, past_units=6, max_delay=6, future_obs = 0, device = "mps", vector_y = False, dow = False):
         """
         Initialize the dataset with a start and end date.
         The dataset will generate matrices for each date within this range.
@@ -48,6 +54,9 @@ class ReportingDataset(Dataset):
         self.triangle = triangle
         self.max_val = max_val
         self.future_obs = future_obs
+        self.vector_y = vector_y
+        self.dow = dow
+        self.start_date = "2013-01-01"
 
     def get_length(self):
         return self.df.shape[0]
@@ -62,7 +71,11 @@ class ReportingDataset(Dataset):
         assert idx < len(self.df), "Index out of range"
         
         # Generate the matrix for the current date
-        matrix, label = reporting_data(self.df, idx=idx, past_units=self.past_units, max_delay=self.max_delay, future_obs=self.future_obs)
+        if self.dow:
+            matrix, dow, label = reporting_data(self.df, idx=idx, past_units=self.past_units, max_delay=self.max_delay, future_obs=self.future_obs, vector_y = self.vector_y, dow=self.dow)
+            dow = torch.tensor(dow).to(self.device)
+        else:
+            matrix, label = reporting_data(self.df, idx=idx, past_units=self.past_units, max_delay=self.max_delay, future_obs=self.future_obs, vector_y = self.vector_y, dow=self.dow)
         
         # Convert the matrix to a PyTorch tensor
         tensor = torch.from_numpy(matrix)
@@ -73,10 +86,12 @@ class ReportingDataset(Dataset):
         
         # Compute the sum of the delays for the current date (row sum)
         label = torch.tensor(label).to(self.device)
+        if self.dow:
+            return (tensor/self.max_val, dow), label 
         return tensor/self.max_val, label
         #return tensor, label
 
-def get_dataset(weeks = True, triangle = False, past_units = 6, max_delay = 6, state = "SP", future_obs = 0, return_df = False, return_mat = False):
+def get_dataset(weeks = True, triangle = False, past_units = 6, max_delay = 6, state = "SP", future_obs = 0, return_df = False, return_mat = False, vector_y = False, dow = False):
     """ Have to return the iterable dataset, so first read in csv file, then convert to delay-format
     Then feed to iterable dataset and return that
     
@@ -148,7 +163,7 @@ def get_dataset(weeks = True, triangle = False, past_units = 6, max_delay = 6, s
     dengdf = np.array(dengdf.values, dtype = np.float32) # wahrscheinlich falsch wenn DT/WK nicht drin ist
     
     ## Define dataset
-    return ReportingDataset(dengdf, max_val=max_val, triangle=triangle, past_units=past_units, max_delay=max_delay, future_obs=future_obs)
+    return ReportingDataset(dengdf, max_val=max_val, triangle=triangle, past_units=past_units, max_delay=max_delay, future_obs=future_obs, vector_y = vector_y, dow = dow)
     
 
 

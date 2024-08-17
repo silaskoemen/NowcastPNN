@@ -41,7 +41,7 @@ class SubsetSampler(Sampler):
         return len(self.indices)
 
 def nll(y_true, y_pred):
-    return -y_pred.log_prob(y_true.type(torch.int)) # re-cast to int after multiplication with 1000
+    return -y_pred.log_prob(y_true.type(torch.int))
 
 def hybrid_loss(y_true, y_pred):
     """ Add negative log likelihood to percentage error to encourage
@@ -67,7 +67,7 @@ def get_loss(y_true, y_pred, loss_fct):
             return mse(y_true, y_pred)
     raise ValueError(f"Loss function {loss_fct} not supported. Choose one of hybrid, nll, mse or mae.")
 
-def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct = "nll", device = torch.device("mps")):
+def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct = "nll", device = torch.device("mps"), dow = False):
     model.to(device)
     model.float()
     optimizer = torch.optim.Adam(model.parameters(), lr = 0.0003, weight_decay=1e-3)
@@ -77,11 +77,14 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         model.train()
         for mat, y in train_loader:
             optimizer.zero_grad()
-            dist_pred = model(mat)
+            if dow:
+                mat, dow_val = mat
+                dist_pred = model(mat, dow_val)
+            else:
+                dist_pred = model(mat)
             loss = get_loss(y, dist_pred, loss_fct=loss_fct).mean()
             loss.retain_grad()
             loss.backward()
-            #print(model.attn1.weight.grad)
             #nn.utils.clip_grad_value_(model.parameters(), 1.0)
 
             ## Check for inf or nan gradients - stop updates in that case
@@ -98,17 +101,6 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         
             optimizer.step()
             batch_loss += loss.item()
-
-            """for name, param in model.named_parameters():
-                print(param)
-                print("param.data",torch.isfinite(param.data).all())
-                print("param.grad.data",torch.isfinite(param.grad.data).all(),"\n")"""
-            #print(f"------------ Loss grad {loss.grad} | data {loss.data} -------------")
-            """for name, param in model.named_parameters():
-                print(name, param, param.grad)
-                #print(name, torch.isfinite(param.grad).all())"""
-        
-        
         
         batch_loss /= len(train_loader)
 
@@ -116,7 +108,11 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
             model.eval()
             test_batch_loss = 0.
             for mat, y in val_loader:
-                test_pred = model(mat)
+                if dow:
+                    mat, dow_val = mat
+                    test_pred = model(mat, dow_val)
+                else:
+                    test_pred = model(mat)
                 test_loss = get_loss(y, test_pred, loss_fct=loss_fct).mean()
                 test_batch_loss += test_loss.item()
             #test_batch_loss /= len(test_loader)
