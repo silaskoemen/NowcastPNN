@@ -45,7 +45,9 @@ f.priordelay <- genPriorDelayDist(mean.delay = 4.413471, max.delay = 39, p = 0.9
 # Check that is adds up to one
 sum(f.priordelay)
 
-#### Go over all test dates ####
+#############################################
+############# RANDOM TEST DAYS ##############
+#############################################
 test_dates = t(read.csv("src/test_dates.csv", header=F))
 rownames(test_dates) <- 1:(length(test_dates))
 
@@ -113,6 +115,80 @@ library(jsonlite)
 # Convert the named list to JSON and save to a file
 json_data <- toJSON(agg_list, pretty = TRUE)
 write(json_data, file = "data/model_predictions/RIVM_list.json")
+
+
+
+#############################################
+########### RECENT OBSERVATIONS #############
+#############################################
+test_dates = t(read.csv("src/test_dates_recent.csv", header=F))
+rownames(test_dates) <- 1:(length(test_dates))
+
+agg_list_recent = list()
+for (i in 1:length(test_dates)) {
+  agg_list_recent[[test_dates[i]]] <- array(NA, dim = c(14, 9, 2)) # 7 CIs + med + min/max
+}
+
+levels <- c(0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1)
+source('src/rivm_utils/RIVM_functions.R')
+
+progress_counter = 1
+for(td in test_dates[135:length(test_dates)]) { # 134 already finished
+  print(paste0("Date ",progress_counter,"/",length(test_dates), " (",td,")"))
+  ## Initialize relevant data
+  rep.data <- dataSetup(
+    data         = df,
+    start.date   = as.Date(td)-50, # Starting date of outbreak - 2013-01-01+(39-1)
+    end.date     = as.Date(td)+50, # Ending date of outbreak (in real-time, leave NULL so end.date = nowcast.date)
+    nowcast.date = as.Date(td),    # Nowcast date
+    days.back    = 39,                    # Number of days back from nowcast.date to include in estimation procedure
+    f.priordelay = f.priordelay)          # Prior reporting delay PMF
+  
+  model.setup <- modelSetup(
+    data = rep.data,
+    ord = 2,
+    kappa = list(u = 1e6, b = 1e6, w = 0.01, s = 1e-6))
+  
+  nowcast.list <- nowcast(
+    data = rep.data,
+    model = model.setup,
+    levels = levels)
+  
+  ncst <- nowcast.list$nowcast
+  
+  ## Go along 14 recent observations
+  for(p in 0:13) {
+    temp_date = format(as.Date(td) - p, format="%Y-%m-%d")
+    #print(paste("Temp date to investigate", temp_date))
+    temp_lvls = ncst[ncst$Date == temp_date, ]
+    
+    # Add levels to agg_list to use later, is array, index p
+    bounds <- matrix(nrow = length(levels), ncol = 2)
+    lower_columns <- paste((1 - levels) / 2)
+    upper_columns <- paste((1 + levels) / 2)
+    for (i in seq_along(levels)) {
+      #print(paste(temp_lvls[lower_columns[i]], temp_lvls[upper_columns[i]]))
+      bounds[i, 1] <- temp_lvls[[lower_columns[i]]]
+      bounds[i, 2] <- temp_lvls[[upper_columns[i]]]
+    }
+    
+    agg_list_recent[[td]][(p+1),,] <- bounds
+    #print(agg_list[[td]][(p+1),,])
+  }
+  progress_counter = progress_counter+1
+  
+}
+
+#plotEpicurve(data = rep.data)
+#plotTrapezoid(data = rep.data)
+
+
+#install.packages("jsonlite")
+library(jsonlite)
+
+# Convert the named list to JSON and save to a file
+json_data_recent <- toJSON(agg_list_recent, pretty = TRUE)
+write(json_data_recent, file = "data/model_predictions/RIVM_list_recent.json")
 
 #############################################
 ############## Investigations ###############

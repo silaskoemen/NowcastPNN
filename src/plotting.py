@@ -2,6 +2,7 @@ import numpy as np
 from torch.utils.data import Subset, DataLoader
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+from metrics import form_predictions
 from scipy import stats
 import torch
 import pandas as pd
@@ -12,33 +13,38 @@ plt.rcParams.update({"axes.labelsize" : "large"}) # 'font.size': 11,
 models = ["Epinowcast", "RIVM", "NowcastPNN"]
 colors = ['dodgerblue', 'black', 'crimson']
 
-def test_plot():
-    plt.figure(figsize=(9, 6))
-    plt.plot(range(10), range(20, 30))
-    plt.xlabel("This is a sample x-label to see how it looks if it's longer")
-    plt.show()
-
 ## Make plot over entire dataset for desired confidence level
-def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], weeks = True, xlims = None, random_split = True, test_idcs = None):
-    model.train()
-    model = model.to("cpu")
+def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], weeks = True, xlims = None, random_split = True, test_idcs = None, total = True, dow = False):
     plotloader = DataLoader(dataset, batch_size=dataset.__len__(), shuffle=False)
     mat, y = next(iter(plotloader))
-    mat, y = mat.to("cpu"), y.to("cpu").numpy()
+    if dow:
+        mat, dow_val = mat
+        mat, dow_val, y = mat.to("cpu"), dow_val.to("cpu"), y.to("cpu").numpy()
+    else:
+        mat, y = mat.to("cpu"), y.to("cpu").numpy()
+    model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std.
+    model.drop1.train() # keeps dropout layers active
+    model.drop2.train()
+    model = model.to("cpu")
     preds = np.zeros((y.shape[0], n_samples))
     for i in range(n_samples):
-        preds[:, i] = np.squeeze(model(mat).sample().numpy())
-    preds_mean = np.quantile(preds, 0.5, axis=1)#np.mean(preds, axis = 1)
-    #preds_mean = torch.mode(preds, dim=1).values#.to_numpy()#np.mean(preds, axis = 1)#stats.mode(preds, axis=0)[0]
-    
+        if total:
+            preds[:, i] = np.squeeze(model(mat).sample().numpy()) if not dow else np.squeeze(model(mat, dow_val).sample().numpy())
+        else:
+            preds[:, i] = form_predictions(temp_counts, y, future_obs=0)    
+    preds_median = np.quantile(preds, 0.5, axis=1)
+    #print(preds_median[2133:2353])
     intervals_dict = {}
     for l in levels:
         intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
+
+    if not total:
+        y = y.sum(axis = 1)
     
     plt.figure(figsize=(10, 6))
     plt.plot(y, label=r"True count", c = "black")
     #plt.plot(y_atm, label="reported on day", c = "darkgrey")
-    plt.plot(preds_mean, label = r"Nowcast predictions", c = "crimson", alpha = 0.75)
+    plt.plot(preds_median, label = r"Nowcast predictions", c = "crimson", alpha = 0.75)
     for l in levels:
         lower, upper = intervals_dict[l]
         plt.fill_between(range(len(y)), lower, upper, color = "crimson", alpha = 0.2, label = f"{int(100*l)}% CI")
@@ -48,21 +54,20 @@ def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], 
             plt.axvline(300, color = "black", label=r"division train/test", linestyle="--")
         else:
             plt.axvline(2100, color = "black", label=r"division train/test", linestyle="--")
-    if test_idcs is not None:
-        plt.vlines(test_idcs, ymin=0, ymax=1000, linewidth = 0.1, colors = "red", label = "Test set")
+    """if test_idcs is not None:
+        plt.vlines(test_idcs, ymin=0, ymax=1000, linewidth = 0.1, colors = "red", label = "Test set")"""
     plt.xlabel(fr"{'EpiWeeks' if weeks else 'Days'} since start of observation")
     plt.legend()
     plt.ylabel(r"Number of cases")
     plt.ylim(bottom=0)
     plt.xlim(left=0)
     if xlims is not None:
-        if random_split:
-            plt.xlim(xlims)
-            plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_subset_{xlims[0]}_{xlims[1]}")
-        else:
-            plt.xlim(2133, 2844)
-            plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_recent")
-    else:
+        plt.xlim(xlims)
+        plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_subset_{xlims[0]}_{xlims[1]}")            
+    elif not random_split:
+        plt.xlim(2133, 2844)
+        plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_recent")
+    else: 
         plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}")
     plt.show()
 
@@ -172,7 +177,6 @@ def plot_wis(epi_scores, rivm_scores, pnn_scores):
 
 def plot_pica(epi_scores, rivm_scores, pnn_scores):
     """ Plot vertical bar charts to visualize the PI Coverage Accuracies scores achieved by all models. """
-    """ Plot vertical bar charts to visualize the WIS scores achieved by all models. """
     scores  = [epi_scores, rivm_scores, pnn_scores]
     # Positions for the bars on the x-axis
     x_pos = np.arange(len(models))
@@ -183,17 +187,11 @@ def plot_pica(epi_scores, rivm_scores, pnn_scores):
     # Plot vertical bars
     ax.bar(x_pos, scores, color=colors, zorder = 2, width = 0.66)
 
-    # Set the x-ticks with the model names
     ax.set_xticks(x_pos)
     ax.set_xticklabels(models, fontsize="large")
-
     ax.set_ylim((0, 0.1))
-
-    # Add grid lines
     ax.grid(True, axis='y', alpha=0.2, zorder=1)
 
-
-    # Display the plot
     plt.tight_layout()
     plt.savefig(f"../outputs/figures/pica")
     plt.show()
