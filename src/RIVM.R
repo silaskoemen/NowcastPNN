@@ -108,8 +108,6 @@ for(td in test_dates) {
 #plotEpicurve(data = rep.data)
 #plotTrapezoid(data = rep.data)
 
-
-#install.packages("jsonlite")
 library(jsonlite)
 
 # Convert the named list to JSON and save to a file

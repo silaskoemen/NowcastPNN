@@ -66,6 +66,11 @@ library(tidyr)
 library(lubridate)
 library(purrr)
 
+
+#############################################
+######### RANDOM TEST OBSERVATIONS ##########
+#############################################
+
 test_dates = t(read.csv("src/test_dates.csv", header=F))
 rownames(test_dates) <- 1:(length(test_dates))
 
@@ -131,7 +136,6 @@ for(td in test_dates) {
   
   # Looks like only starts nowcasting from reference target date (latest_date) onwards
   # Obviously not recorded bc not included in reference dates anymore
-  #plot(nowcast, latest_obs = latest_tab)
   samples <- summary(nowcast, type="nowcast_samples") # have chains * iter_sampling samples
   
   ## Use samples for quantiles, min, max (width) and all criteria
@@ -162,77 +166,105 @@ json_epinc <- toJSON(agg_list_epinc, pretty = TRUE)
 write(json_epinc, file = "data/model_predictions/epinowcast_list.json")
 
 
-######### SINGLE OBSERVATION TEST RUN #########
 
-# Target date needs to be final date of reports NOT end of reference dates directly
-target_date = as.Date("2015-03-16")
-#data_tab = data.table(result_df)
-data_tab = cum_dt |> enw_filter_report_dates(latest_date = target_date+40)# |> enw_filter_reference_dates(latest_date = target_date, include_days = 30) # first enw_filter_reference_dates(earliest_date = target_date - 30, latest_date = target_date)
-data_tab = enw_complete_dates(data_tab, max_delay = 40)
-#data_tab = data_tab[!is.na(reference_date) & !is.na(report_date)]
-# CUMULATIVE???, then would explain a lot, yes - cumulative - lorl
+#############################################
+########### RECENT OBSERVATIONS #############
+#############################################
+test_dates = t(read.csv("src/test_dates_recent.csv", header=F))
+rownames(test_dates) <- 1:(length(test_dates))
 
-retro_tab  <- data_tab |>
-  enw_filter_report_dates(remove_days = 40) |>
-  enw_filter_reference_dates(include_days = 40) # hat as available on day correctly
+agg_list_epinc_recent = list()
+for (i in 1:length(test_dates)) {
+  agg_list_epinc_recent[[test_dates[i]]] <- array(NA, dim = c(14, 9, 2)) # 7 CIs + med + min/max
+}
 
-# Soll wahrscheinlich available looking back plotten,
-# Ergo pro reference date group by und count?
-latest_tab <- data_tab |>
-  enw_latest_data() |>
-  enw_filter_reference_dates(remove_days = 40, include_days = 40)
-
-on_day_tab = data_tab[(reference_date > target_date - 40) & (reference_date <= target_date)]
-on_day_tab = on_day_tab[, sum(confirm), by = reference_date]
-setnames(on_day_tab, "V1", "confirm")
-
-retro_on_day = retro_tab[, sum(confirm), by = reference_date]
-setnames(retro_on_day, "V1", "confirm")
-
-pobs <- enw_preprocess_data(retro_tab, max_delay = 40)
-
-expectation_module <- enw_expectation(
-  ~ 0 + (1 | day), data = pobs
-)
-reference_module <- enw_reference(~1, distribution = "lognormal", data = pobs)
-report_module <- enw_report(~ (1 | day_of_week), data = pobs)
-model <- enw_model(threads = TRUE)
-
-options(mc.cores = 8) # usable cores 
-nowcast <- epinowcast(data = pobs,
-                      expectation = expectation_module,
-                      reference = reference_module,
-                      report = report_module,
-                      fit = enw_fit_opts(
-                        save_warmup = FALSE, pp = TRUE,
-                        chains = 2, threads_per_chain = 2,
-                        iter_sampling = 500, iter_warmup = 250,
-                        show_messages = T
-                      ),
-                      model = model
-) # 43.6 seconds
-
-# Looks like only starts nowcasting from reference target date (latest_date) onwards
-# Obviously not recorded bc not included in reference dates anymore
-plot(nowcast, latest_obs = latest_tab)
-samples <- summary(nowcast, type="nowcast_samples") # have chains * iter_sampling samples
-
-## Use samples for quantiles, min, max (width) and all criteria
-target_samples = samples[samples$reference_date == target_date]$sample
-length(target_samples)
-
-levels = c(0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1)
-
-## Make bounds for every day in current to -13, set in big matrix (14, 9, 2) and that per date as key
-bounds <- matrix(nrow = length(levels), ncol = 2)
+levels <- c(0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1)
 lower_columns <- (1 - levels) / 2
 upper_columns <- (1 + levels) / 2
 
-for (i in seq_along(levels)) {
-  #print(paste(temp_lvls[lower_columns[i]], temp_lvls[upper_columns[i]]))
-  bounds[i, 1] <- unname(quantile(target_samples, probs=lower_columns[i], na.rm=T))
-  bounds[i, 2] <- unname(quantile(target_samples, probs=upper_columns[i], na.rm=T))
+progress_counter = 1
+for(td in test_dates[692:length(test_dates)]) {
+  print(paste0("Date ",progress_counter,"/",length(test_dates), " (",td,")"))
+  
+  target_date = as.Date(td)
+  #data_tab = data.table(result_df)
+  data_tab = cum_dt |> enw_filter_report_dates(latest_date = target_date+40)# |> enw_filter_reference_dates(latest_date = target_date, include_days = 30) # first enw_filter_reference_dates(earliest_date = target_date - 30, latest_date = target_date)
+  data_tab = enw_complete_dates(data_tab, max_delay = 40)
+  #data_tab = data_tab[!is.na(reference_date) & !is.na(report_date)]
+  # CUMULATIVE???, then would explain a lot, yes - cumulative - lorl
+  
+  retro_tab  <- data_tab |>
+    enw_filter_report_dates(remove_days = 40) |>
+    enw_filter_reference_dates(include_days = 40) # hat as available on day correctly
+  
+  # Soll wahrscheinlich available looking back plotten,
+  # Ergo pro reference date group by und count?
+  latest_tab <- data_tab |>
+    enw_latest_data() |>
+    enw_filter_reference_dates(remove_days = 40, include_days = 40)
+  
+  on_day_tab = data_tab[(reference_date > target_date - 40) & (reference_date <= target_date)]
+  on_day_tab = on_day_tab[, sum(confirm), by = reference_date]
+  setnames(on_day_tab, "V1", "confirm")
+  
+  retro_on_day = retro_tab[, sum(confirm), by = reference_date]
+  setnames(retro_on_day, "V1", "confirm")
+  
+  pobs <- enw_preprocess_data(retro_tab, max_delay = 40)
+  
+  expectation_module <- enw_expectation(
+    ~ 0 + (1 | day), data = pobs
+  )
+  reference_module <- enw_reference(~1, distribution = "lognormal", data = pobs)
+  report_module <- enw_report(~ (1 | day_of_week), data = pobs)
+  model <- enw_model(threads = TRUE)
+  
+  options(mc.cores = 8) # usable cores 
+  nowcast <- epinowcast(data = pobs,
+                        expectation = expectation_module,
+                        reference = reference_module,
+                        report = report_module,
+                        fit = enw_fit_opts(
+                          save_warmup = FALSE, pp = TRUE,
+                          chains = 2, threads_per_chain = 2,
+                          iter_sampling = 500, iter_warmup = 250,
+                          show_messages = T
+                        ),
+                        model = model
+  ) # 43.6 seconds
+  
+  # Looks like only starts nowcasting from reference target date (latest_date) onwards
+  # Obviously not recorded bc not included in reference dates anymore
+  samples <- summary(nowcast, type="nowcast_samples") # have chains * iter_sampling samples
+  
+  ## Use samples for quantiles, min, max (width) and all criteria
+  
+  for(p in 0:13) {
+    temp_date = as.Date(td) - p
+    #print(paste("Temp date to investigate", temp_date))
+    target_samples = samples[samples$reference_date == temp_date]$sample
+    
+    # Add levels to agg_list to use later, is array, index p
+    bounds <- matrix(nrow = length(levels), ncol = 2)
+    
+    for (i in seq_along(levels)) {
+      #print(paste(temp_lvls[lower_columns[i]], temp_lvls[upper_columns[i]]))
+      bounds[i, 1] <- unname(quantile(target_samples, probs=lower_columns[i], na.rm=T))
+      bounds[i, 2] <- unname(quantile(target_samples, probs=upper_columns[i], na.rm=T))
+    }
+    
+    agg_list_epinc_recent[[td]][(p+1),,] <- bounds
+  }
+  progress_counter = progress_counter+1
 }
 
+# delete 2010-07-07, wrongly created instead of 2020
 
-                           
+
+#agg_list_epinc_recent <- agg_list_epinc_recent[1:(length(agg_list_epinc_recent)-1)] # accidentally added wrong date to list, remove 
+
+library(jsonlite)
+
+# Convert the named list to JSON and save to a file
+json_epinc_recent <- toJSON(agg_list_epinc_recent, pretty = TRUE)
+write(json_epinc_recent, file = "data/model_predictions/epinowcast_list_recent.json")
