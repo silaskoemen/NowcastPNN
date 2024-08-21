@@ -5,6 +5,11 @@ from datetime import datetime, timedelta
 from metrics import form_predictions
 from scipy import stats
 import torch
+from sklearn.decomposition import PCA
+import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.colors import LinearSegmentedColormap
+import torch
 import pandas as pd
 plt.rcParams['font.family'] = "Times New Roman" #"cmr10"
 plt.rcParams.update({"axes.labelsize" : "large"}) # 'font.size': 11, 
@@ -113,6 +118,48 @@ def plot_coverages(epi_coverages, rivm_coverages, pnn_coverages, levels = [0.5, 
     plt.show()
 
 
+def visualize_embeddings(path = "./weights/embedding_weights"):
+    embeddings = torch.load("./weights/embedding_weights").cpu().numpy()
+    pca = PCA(n_components=3)
+    vis_dims = pca.fit_transform(embeddings)
+
+    fig = plt.figure(figsize=(11.5, 3.5))  # Adjust figure size for better spacing
+    colors = ["crimson", "deepskyblue"]
+    n_bins = 7  # Number of color bins in the color map
+    cmap_name = 'black_blue'
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
+
+    weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    # Different view angles for each cube
+    angles = [(25, 20), (25, 45), (25, 60)]
+
+    # Create 3 subplots for the 3 cubes
+    for j in range(3):
+        ax = fig.add_subplot(1, 3, j+1, projection='3d')
+        for i, day in enumerate(weekdays):
+            # Assuming vis_dims is a list of 3D coordinates for each weekday
+            sub_matrix = np.array(vis_dims[i])
+            x = sub_matrix[0]
+            y = sub_matrix[1]
+            z = sub_matrix[2]
+            colors = [cmap(i/len(weekdays))]
+            ax.scatter(x, y, zs=z, zdir='z', c=colors, label=day, s=60)
+
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        #ax.set_title(f'Cube {j+1}')  # Title for each cube
+
+        # Set different viewing angles
+        ax.view_init(elev=angles[j][0], azim=angles[j][1])
+
+    # Add legend only to the first subplot to avoid repetition
+    fig.legend(weekdays, bbox_to_anchor=(0.5, 0.9), loc='upper center', ncol=7)
+    plt.savefig("../outputs/figures/visualization_embeddings.svg")
+    plt.show()
+
+
 def plot_is_decomposition(epi_scores, rivm_scores, pnn_scores):
     #models = ["Epinowcast", "RIVM", "NowcastPNN"]
     
@@ -197,7 +244,7 @@ def plot_pica(epi_scores, rivm_scores, pnn_scores):
     plt.show()
 
 
-def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int = 30, future_units = 0, start_date: str = "2013-01-01", weeks = False) -> None:
+def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int = 30, past_units = 40, future_units = 0, start_date: str = "2013-01-01", weeks = False) -> None:
     """ For specific index (specific date), calculate the difference between true counts versus observed at date
     
     Args:
@@ -209,8 +256,11 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
     assert idx > horizon, "Observation index should be larger than horizon to go backwards"
     if isinstance(df, pd.DataFrame): df = np.array(df.values, dtype = np.float32)
 
-    df = df[(idx-horizon+1):(idx+future_units+1), :]
+    ## Add first of month as ticks, add all reported on day, add prediction with past from model
+
+    df = df[(idx-horizon+1):(idx+future_units+1), :].copy()
     max_delay = df.shape[1]
+    y_otd = df[:, 0]
     y_true = df.sum(axis = 1)
 
     mask = np.zeros((horizon+future_units, max_delay), dtype=bool)
@@ -223,18 +273,37 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
 
     y_obs = df.sum(axis = 1)
 
+    dates = [days_to_date(start_date, days, past_units) for days in range(idx - horizon+1, idx+future_units+1)]
+    
+    # Create a DataFrame
+    date_df = pd.DataFrame({'Date': dates})
+
     plt.figure(figsize=(9, 5))
-    plt.plot(y_true, label="True count", color = "black")
-    plt.plot(y_obs, label=f"Observed on day {idx}", color = "crimson") # convert with start date to day and then plot with months
-    if weeks:
+    plt.plot(date_df["Date"], y_true, label="True count", color = "black")
+    plt.plot(date_df["Date"], y_obs, label=f"Observed up to {date_df.iloc[-(future_units+1), 0].strftime('%Y-%m-%d')}", color = "crimson") # convert with start date to day and then plot with months
+    plt.plot(date_df["Date"], y_otd, label= "Reported on day", c = "grey")
+    """if weeks:
         plt.xlabel("EpiWeeks in the past")
     else:
         plt.xlabel("Days in the past")
-    plt.xticks([*range(horizon)], [*range(horizon-1, -1, -1)])
-    plt.axvline(horizon-1, color = "black", linestyle="--", label="Current day")
+    plt.xticks([*range(horizon)], [*range(horizon-1, -1, -1)])"""
+    
+    # Plot the values
+    #plt.figure(figsize=(10, 5))
+    
+    # Set the major x-ticks to the first of each month
+    
+    plt.axvline(date_df.iloc[-(future_units+1)], color = "black", linestyle="--", label="Current day")
     plt.ylabel("Number of cases")
+    """date_df['MonthStart'] = date_df['Date'].apply(lambda x: x.replace(day=1))
+    month_starts = date_df['MonthStart'].unique()
+    
+    plt.xticks(month_starts, [date.strftime('%Y-%m-%d') for date in month_starts], rotation=45)"""
+    plt.xticks(rotation = 30)
     plt.legend()
+    plt.xlim(date_df["Date"].iloc[0], date_df["Date"].iloc[-1])
     plt.grid(alpha=0.2)
+    plt.savefig("../outputs/figures/nowcasting_task_true_on_day.svg")
     plt.show()
 
 
