@@ -69,7 +69,7 @@ class ReportingDataset(Dataset):
         # Calculate the date for the current iteration, considering the adjusted range
         idx += self.past_units-1
         assert idx < len(self.df), "Index out of range"
-        
+
         # Generate the matrix for the current date
         if self.dow:
             matrix, dow, label = reporting_data(self.df, idx=idx, past_units=self.past_units, max_delay=self.max_delay, future_obs=self.future_obs, vector_y = self.vector_y, dow=self.dow)
