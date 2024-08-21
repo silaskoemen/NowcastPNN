@@ -36,6 +36,7 @@ def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], 
         if total:
             preds[:, i] = np.squeeze(model(mat).sample().numpy()) if not dow else np.squeeze(model(mat, dow_val).sample().numpy())
         else:
+            temp_counts = model(mat).sample().numpy()
             preds[:, i] = form_predictions(temp_counts, y, future_obs=0)    
     preds_median = np.quantile(preds, 0.5, axis=1)
     #print(preds_median[2133:2353])
@@ -278,7 +279,7 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
     # Create a DataFrame
     date_df = pd.DataFrame({'Date': dates})
 
-    plt.figure(figsize=(9, 5))
+    plt.figure(figsize=(8, 4))
     plt.plot(date_df["Date"], y_true, label="True count", color = "black")
     plt.plot(date_df["Date"], y_obs, label=f"Observed up to {date_df.iloc[-(future_units+1), 0].strftime('%Y-%m-%d')}", color = "crimson") # convert with start date to day and then plot with months
     plt.plot(date_df["Date"], y_otd, label= "Reported on day", c = "grey")
@@ -287,12 +288,6 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
     else:
         plt.xlabel("Days in the past")
     plt.xticks([*range(horizon)], [*range(horizon-1, -1, -1)])"""
-    
-    # Plot the values
-    #plt.figure(figsize=(10, 5))
-    
-    # Set the major x-ticks to the first of each month
-    
     plt.axvline(date_df.iloc[-(future_units+1)], color = "black", linestyle="--", label="Current day")
     plt.ylabel("Number of cases")
     """date_df['MonthStart'] = date_df['Date'].apply(lambda x: x.replace(day=1))
@@ -306,6 +301,41 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
     plt.savefig("../outputs/figures/nowcasting_task_true_on_day.svg")
     plt.show()
 
+def plot_max_delay_day(df_unlimited_delay):
+    unlim_delay_array = np.array(df_unlimited_delay)
+    ## Could plot pdf and ecdf for both, next to each other to show
+    fractions_reported = np.ndarray((365,))
+    cum_reported = np.ndarray((365,))
+    for d in range(365):
+        fractions_reported[d] = unlim_delay_array[:, d].sum()/unlim_delay_array.sum()
+        cum_reported[d] = unlim_delay_array[:, :(d+1)].sum()/unlim_delay_array.sum()
+
+    n_days_99 = next(i for i, value in enumerate(cum_reported) if value >= 0.99)
+
+    fig, axs = plt.subplots(1, 2, figsize=(9, 4))
+
+    # Plot for cum_reported
+    axs[0].plot(cum_reported, label='Cumulative Reported Cases', color='grey')
+    axs[0].axhline(0.99, color='red', linestyle='-.', label='99% threshold')
+    axs[0].axvline(n_days_99, color='black', linestyle='--', label=f'Day {n_days_99}')
+    axs[0].set_xlabel('Days')
+    axs[0].set_ylabel('Cumulative Reported Cases')
+    axs[0].legend()
+    axs[0].set_ylim(0, 1.05)
+    axs[0].set_xlim(-5,365)
+    axs[0].grid(alpha=.2)
+
+    # Plot for fraction_reported
+    axs[1].plot(fractions_reported, label='Fraction Reported', color='dodgerblue')
+    axs[1].axvline(n_days_99, color='black', linestyle='--', label=f'Day {n_days_99}')
+    axs[1].set_xlabel('Days')
+    axs[1].set_ylabel('Fraction Reported')
+    axs[1].legend()
+    axs[1].set_xlim(-5,365)
+    axs[1].grid(alpha=.2)
+    plt.tight_layout()
+    plt.savefig("../outputs/figures/day_max_delay.svg")
+    plt.show()
 
 def plot_past_correction(model, past_units, max_delay, future_obs, weeks, dataset, padding = "both", padding_val = 0, n_samples = 200, levels = [0.5, 0.95], state = "SP", idx = 787, test_idcs = None):
     model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std.
