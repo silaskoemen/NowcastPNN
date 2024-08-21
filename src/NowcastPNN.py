@@ -129,3 +129,7 @@ class PNNSumDaily(nn.Module):
         #dist = torch.distributions.Poisson(rate=1000*self.softplus(x))
         dist = NB(lbda = self.const*self.softplus(x[:, 0]), phi = self.const**2*self.softplus(x[:, 1])+1e-5)
         return torch.distributions.Independent(dist, reinterpreted_batch_ndims=1)
+
+nowcast_pnn_dow = None # run once and save
+## Let it train once, then keep embedding and freeze them, from pre-trained, save somewhere
+torch.save(nowcast_pnn_dow.embed.weight, f"./weights/embedding_weights")
