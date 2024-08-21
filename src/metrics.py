@@ -26,6 +26,23 @@ def Epi_to_dict(levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], future_o
         python_dict[date] = lol
     return python_dict
 
+def postprocess_rivm_level(level_dict, levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]):
+    ## Check median separately
+    med = level_dict[0]
+    for i in range(1, len(med)):
+        if (med[i] / med[i-1]) > 2 or (med[i] / med[i-1]) < 0.3:
+            med[i] = med[i-1]
+    level_dict[0] = med
+    for l in levels[1:]:
+        lower, upper = level_dict[l]
+        for i in range(1, len(lower)):
+            if (lower[i] / lower[i-1]) > 2 or (lower[i] / lower[i-1]) < 0.3:
+                lower[i] = lower[i-1]
+            if (upper[i] / upper[i-1]) > 2 or (upper[i] / upper[i-1]) < 0.3:
+                upper[i] = upper[i-1]
+        level_dict[l] = lower, upper
+    return level_dict
+
 def date_to_level_dict(date_dict, levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], level_idcs = {0: 0, 0.05: 1, 0.1: 2, 0.25: 3, 0.5: 4, 0.75: 5, 0.9: 6, 0.95: 7, 1: 8}):
 
     # Initialize the new dictionary
@@ -314,13 +331,13 @@ def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.
 
     cov_dict = coverages(levels, intervals_dict, y)
     pica = PICA(levels, intervals_dict, y)
-    cwc = CWC(levels, (min_preds, max_preds), intervals_dict, y)
+    #cwc = CWC(levels, (min_preds, max_preds), intervals_dict, y)
     wis = WIS(levels, intervals_dict, y, pred_med=pred_median)
     IS(levels, intervals_dict, y)
     is_decomp = IS_decomposed(levels, intervals_dict, y)
 
     ## Think about having dictionary, where each element is set
-    return cov_dict, pica, cwc, wis, is_decomp
+    return {"coverages": cov_dict, "pica": pica, "wis": wis, "is": is_decomp}
     """if return_y:
         if return_coverages and return_is_decomposed:
             return cov_dict, pica, cwc, wis, is_decomp, y
