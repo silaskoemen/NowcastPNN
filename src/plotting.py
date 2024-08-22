@@ -119,8 +119,8 @@ def plot_coverages(epi_coverages, rivm_coverages, pnn_coverages, levels = [0.5, 
     plt.show()
 
 
-def visualize_embeddings(path = "./weights/embedding_weights"):
-    embeddings = torch.load("./weights/embedding_weights").cpu().numpy()
+def visualize_embeddings(dim = 8):
+    embeddings = torch.load(f"./weights/embedding_weights_{dim}").cpu().detach().numpy()
     pca = PCA(n_components=3)
     vis_dims = pca.fit_transform(embeddings)
 
@@ -133,7 +133,7 @@ def visualize_embeddings(path = "./weights/embedding_weights"):
     weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     # Different view angles for each cube
-    angles = [(25, 20), (25, 45), (25, 60)]
+    angles = [(20, 20), (20, 45), (20, 60)]
 
     # Create 3 subplots for the 3 cubes
     for j in range(3):
@@ -337,7 +337,7 @@ def plot_max_delay_day(df_unlimited_delay):
     plt.savefig("../outputs/figures/day_max_delay.svg")
     plt.show()
 
-def plot_past_correction(model, past_units, max_delay, future_obs, weeks, dataset, padding = "both", padding_val = 0, n_samples = 200, levels = [0.5, 0.95], state = "SP", idx = 787, test_idcs = None):
+def plot_past_correction(model, past_units, max_delay, future_obs, weeks, dataset, save = False, random_split = True, padding = "both", dow = False, padding_val = 0, n_samples = 200, levels = [0.5, 0.95], state = "SP", idx = 787, test_idcs = None):
     model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std.
     model.drop1.train() # keeps dropout layers active
     model.drop2.train()
@@ -354,6 +354,9 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
     else:
         raise AssertionError("Provide just one of idx or test_idcs, not both")
     mat, y = dataset[idx_current]
+    if dow:
+        mat, dow_val = mat
+        dow_val = dow_val.to("cpu")
     mat, y = torch.unsqueeze(mat.to("cpu"), 0), y.to("cpu").numpy()
     preds = np.zeros((future_obs, n_samples)) # 7x200
     y_vals = []
@@ -373,28 +376,38 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
         for r in range(idx_current+1, idx_current+padding_val+1):
             y_vals.append(dataset[r][1].cpu().numpy())
     
+
+    dates = [days_to_date("2013-01-01", days, past_units) for days in range(x_min, x_max+1)]
+    cur_date = days_to_date("2013-01-01", idx, past_units)
+    
+    # Create a DataFrame
+    date_df = pd.DataFrame({'Date': dates})
+    
     for f in range(future_obs):
-        model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}-{state}"))
+        model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}{'-rec' if not random_split else ''}{'-dow' if dow else ''}"))
         for i in range(n_samples):
-            preds[f, i] = model(mat).sample().numpy()
+            if dow:
+                preds[f, i] = model(mat, dow_val).sample().numpy()
+            else:
+                preds[f, i] = model(mat).sample().numpy()
     preds_mean = np.quantile(preds, 0.5, axis=1)
     
     intervals_dict = {}
     for l in levels:
         intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
-    
     plt.figure(figsize=(12, 7))
-    plt.plot([*range(x_min, x_max+1)], y_vals, label="True count", c = "black")
-    plt.plot([*range(idx_current-future_obs+1, idx_current+1)], preds_mean, label = "Median nowcasted predictions", c = "crimson", alpha = 0.75)
+    plt.plot(date_df["Date"], y_vals, label="True count", c = "black") # [*range(x_min, x_max+1)]
+    plt.plot(date_df["Date"].iloc[(padding_val):(padding_val+future_obs)], preds_mean, label = "Median nowcasted predictions", c = "crimson", alpha = 0.75) # [*range(idx_current-future_obs+1, idx_current+1)]
     for l in levels:
         lower, upper = intervals_dict[l]
-        plt.fill_between([*range(idx_current-future_obs+1, idx_current+1)], lower, upper, color = "crimson", alpha = 0.2, label = f"{int(100*l)}% CI")
+        plt.fill_between(date_df["Date"].iloc[(padding_val):(padding_val+future_obs)], lower, upper, color = "crimson", alpha = 0.2, label = f"{int(100*l)}% CI")
     plt.grid(alpha=.2)
-    plt.axvline(idx_current, color = "black", linestyle = "--", label = f"Current {'day' if not weeks else 'week'}")
+    plt.axvline(cur_date, color = "black", linestyle = "--", label = f"Current {'day' if not weeks else 'week'}")
     plt.xlabel("Days")
     plt.legend()
     plt.ylabel("Number of cases")
-    plt.savefig(f"../outputs/figures/past_correction_{'week' if weeks else 'day'}_{idx_current}_fut{future_obs}")
+    if save:
+        plt.savefig(f"../outputs/figures/past_correction_{'week' if weeks else 'day'}_{idx_current}_fut{future_obs}")
     plt.show()
 
 def days_to_date(start_date, num_days, past_units = 1):

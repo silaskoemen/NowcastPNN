@@ -338,17 +338,3 @@ def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.
 
     ## Think about having dictionary, where each element is set
     return {"coverages": cov_dict, "pica": pica, "wis": wis, "is": is_decomp}
-    """if return_y:
-        if return_coverages and return_is_decomposed:
-            return cov_dict, pica, cwc, wis, is_decomp, y
-        elif return_is_decomposed:
-            return is_decomp, y
-        elif return_coverages:
-            return cov_dict, y
-    else:
-        if return_coverages and return_is_decomposed:
-            return cov_dict, is_decomp
-        elif return_is_decomposed:
-            return is_decomp
-        elif return_coverages:
-            return cov_dict"""

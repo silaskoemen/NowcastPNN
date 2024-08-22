@@ -85,13 +85,13 @@ class ReportingDataset(Dataset):
             tensor = torch.sum(tensor, dim = 1)
         
         # Compute the sum of the delays for the current date (row sum)
-        label = torch.tensor(label).to(self.device)
+        label = torch.tensor([label]).to(self.device)
         if self.dow:
             return (tensor/self.max_val, dow), label 
         return tensor/self.max_val, label
         #return tensor, label
 
-def get_dataset(weeks = True, triangle = False, past_units = 6, max_delay = 6, state = "SP", future_obs = 0, return_df = False, return_mat = False, vector_y = False, dow = False):
+def get_dataset(weeks = False, triangle = False, past_units = 40, max_delay = 40, state = "SP", future_obs = 0, return_df = False, return_mat = False, vector_y = False, dow = False, path = "../data/derived/DENGSP.csv"):
     """ Have to return the iterable dataset, so first read in csv file, then convert to delay-format
     Then feed to iterable dataset and return that
     
@@ -100,7 +100,7 @@ def get_dataset(weeks = True, triangle = False, past_units = 6, max_delay = 6, s
     Returns:
     """
     assert not (return_df and return_mat), "Only either dataframe or matrix can be returned"
-    dengdf = pd.read_csv(f"../data/derived/DENG{state}.csv", index_col=0)
+    dengdf = pd.read_csv(path, index_col=0)#pd.read_csv(f"../data/derived/DENG{state}.csv", index_col=0)
     date_format = "%Y-%m-%d"
     dengdf['DT_NOTIFIC'] = pd.to_datetime(dengdf['DT_NOTIFIC'], format=date_format)
     dengdf['DT_SIN_PRI'] = pd.to_datetime(dengdf['DT_SIN_PRI'], format=date_format)
