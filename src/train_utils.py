@@ -36,7 +36,6 @@ class SubsetSampler(Sampler):
         for idx in self.indices:
             yield idx
 
-
     def __len__(self):
         return len(self.indices)
 
@@ -78,7 +77,7 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         for mat, y in train_loader:
             optimizer.zero_grad()
             if dow:
-                mat, dow_val = mat
+                mat, dow_val = mat.copy()
                 dist_pred = model(mat, dow_val)
             else:
                 dist_pred = model(mat)
@@ -92,6 +91,7 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
             for name, param in model.named_parameters():
                 if param.grad is not None:
                     # valid_gradients = not (torch.isnan(param.grad).any() or torch.isinf(param.grad).any())
+                    #print(f"{name} - Gradient NaNs: {torch.isnan(param.grad).any()} - Max Gradient: {param.grad.abs().max()}")
                     valid_gradients = not (torch.isnan(param.grad).any())
                     if not valid_gradients:
                         break
@@ -122,6 +122,7 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         model.train()
         #if e % 50 == 0 or e == num_epochs-1:
         print(f"Epoch {e+1} - Train loss: {batch_loss:.3} - Val loss: {test_batch_loss:.3} - ES count: {early_stopper.get_count()}")
+    
 
 
 
@@ -131,7 +132,7 @@ class EarlyStopper:
     As seen e.g. in https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch and adapted to include 
     restoration of best weights.
     """
-    def __init__(self, past_units, max_delay, weeks, future_obs, state, triangle, patience = 30):
+    def __init__(self, past_units, max_delay, weeks = False, future_obs = 0, state = "SP", triangle = True, patience = 30, random_split = False, dow = False, n_training = None):
         self.patience = patience
         self.counter = 0
         self.min_loss = float('inf')
@@ -141,13 +142,19 @@ class EarlyStopper:
         self.future_obs = future_obs
         self.state = state
         self.triangle = triangle
+        self.random_split = random_split
+        self.dow = dow
+        self.n_training = n_training
 
     def early_stop(self, val_loss, model):
         if val_loss < self.min_loss:
             self.min_loss = val_loss
             self.counter = 0
             ## Save best weights
-            torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-{('tri' if self.triangle else 'sum')}-fut{self.future_obs}-{self.state}")
+            if self.n_training is not None:
+                torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-fut{self.future_obs}{'-rec' if not self.random_split else ''}{'-dow' if self.dow else ''}-{self.n_training}")
+            else:
+                torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-fut{self.future_obs}{'-rec' if not self.random_split else ''}{'-dow' if self.dow else ''}")
         elif val_loss > self.min_loss:
             self.counter += 1
             if self.counter >= self.patience:
