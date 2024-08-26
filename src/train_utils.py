@@ -19,8 +19,7 @@ class Sampler(object):
 
     def __len__(self):
         raise NotImplementedError
-
-
+    
 class SubsetSampler(Sampler):
     r""" Sampler for PyTorch that uses a given subset of indices to sample from. Not random, to use for reproducible samplings
     on the test set.
@@ -28,19 +27,20 @@ class SubsetSampler(Sampler):
     Arguments:
         indices (sequence): a sequence of indices
     """
-
     def __init__(self, indices):
         self.indices = indices
-
     def __iter__(self):
         for idx in self.indices:
             yield idx
-
     def __len__(self):
         return len(self.indices)
 
 def nll(y_true, y_pred):
-    return -y_pred.log_prob(y_true.type(torch.int))
+    nll_loss = -y_pred.log_prob(y_true)
+    #print(nll_loss)
+    #nll_loss = torch.nan_to_num(nll_loss, posinf=1e6)
+    #print(nll_loss)
+    return nll_loss
 
 def hybrid_loss(y_true, y_pred):
     """ Add negative log likelihood to percentage error to encourage
@@ -81,10 +81,10 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
                 dist_pred = model(mat, dow_val)
             else:
                 dist_pred = model(mat)
-            loss = get_loss(y, dist_pred, loss_fct=loss_fct).mean()
+            loss = get_loss(y.to(device), dist_pred, loss_fct=loss_fct).mean()
             loss.retain_grad()
             loss.backward()
-            #nn.utils.clip_grad_value_(model.parameters(), 1.0)
+            #nn.utils.clip_grad_value_(model.parameters(), 10.0)
 
             ## Check for inf or nan gradients - stop updates in that case
             valid_gradients = True
@@ -103,17 +103,16 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
             batch_loss += loss.item()
         
         batch_loss /= len(train_loader)
-
         with torch.no_grad(): # performance on test/validation set
             model.eval()
             test_batch_loss = 0.
             for mat, y in val_loader:
                 if dow:
                     mat, dow_val = mat
-                    test_pred = model(mat, dow_val)
+                    test_pred = model(mat.to(device), dow_val.to(device))
                 else:
                     test_pred = model(mat)
-                test_loss = get_loss(y, test_pred, loss_fct=loss_fct).mean()
+                test_loss = get_loss(y.to(device), test_pred, loss_fct=loss_fct).mean()
                 test_batch_loss += test_loss.item()
             #test_batch_loss /= len(test_loader)
             if early_stopper.early_stop(test_batch_loss, model):
@@ -124,15 +123,13 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         print(f"Epoch {e+1} - Train loss: {batch_loss:.3} - Val loss: {test_batch_loss:.3} - ES count: {early_stopper.get_count()}")
     
 
-
-
 class EarlyStopper:
     """ Class implementing early stopping. Theoretically, PyTorch lightning could be used, but this might be more rubust.
     
     As seen e.g. in https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch and adapted to include 
     restoration of best weights.
     """
-    def __init__(self, past_units, max_delay, weeks = False, future_obs = 0, state = "SP", triangle = True, patience = 30, random_split = False, dow = False, n_training = None):
+    def __init__(self, past_units, max_delay, weeks = False, future_obs = 0, state = "SP", triangle = True, patience = 30, random_split = False, dow = False, n_training = None, biggest_outbreak = False):
         self.patience = patience
         self.counter = 0
         self.min_loss = float('inf')
@@ -145,13 +142,16 @@ class EarlyStopper:
         self.random_split = random_split
         self.dow = dow
         self.n_training = n_training
+        self.biggest_outbreak = biggest_outbreak
 
     def early_stop(self, val_loss, model):
         if val_loss < self.min_loss:
             self.min_loss = val_loss
             self.counter = 0
             ## Save best weights
-            if self.n_training is not None:
+            if self.biggest_outbreak:
+                torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-fut{self.future_obs}-biggest{'-dow' if self.dow else ''}")
+            elif self.n_training is not None:
                 torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-fut{self.future_obs}{'-rec' if not self.random_split else ''}{'-dow' if self.dow else ''}-{self.n_training}")
             else:
                 torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-fut{self.future_obs}{'-rec' if not self.random_split else ''}{'-dow' if self.dow else ''}")

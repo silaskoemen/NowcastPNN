@@ -26,6 +26,12 @@ class NegBin(ExponentialFamily):
     @property
     def mode(self):
         return torch.floor((self.phi-1)*self.lbda/self.phi)
+    
+    def get_lbda(self):
+        return self.lbda
+    
+    def get_phi(self):
+        return self.phi
 
     @property
     def variance(self):
@@ -65,7 +71,12 @@ class NegBin(ExponentialFamily):
     def log_prob(self, y):
         if self._validate_args:
             self._validate_sample(y)
-        lbda, phi, y = broadcast_all(self.lbda, self.phi, y)
+        if len(y.size()) > 1:
+            y = torch.squeeze(y)
+        #lbda, phi, y = broadcast_all(self.lbda, self.phi, y)
+        #lbda, phi, y = torch.broadcast_tensors(self.lbda, self.phi, y)
+        lbda, phi = self.lbda, self.phi
+        #print(lbda.size(), phi.size(), y.size())
         return (y + phi).lgamma() - (y+1).lgamma() - phi.lgamma() + y.xlogy(lbda) - y.xlogy((lbda + phi)) + phi.xlogy(phi) - phi.xlogy((phi + lbda))
 
     """@property
