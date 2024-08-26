@@ -1,6 +1,6 @@
 # NowcastPNN
 
-This repository contains all code required for reproducing the results corresponding to the thesis paper titled "Attention-Based Probabilistic Neural Networks for Nowcasting of Dengue Fever in Brazil". All data necessary is available upon request. Any contributions to this repository and the NowcastPNN model are welcome.
+This repository contains all code required for reproducing the results corresponding to the thesis paper titled "Attention-Based Probabilistic Neural Networks for Nowcasting of Dengue Fever in Brazil". The paper proposes a novel neural network (NN) structure, based on the popular attention mechanism and outputs a distribution over the target variable instead of a single point prediction (hence the name probabilistic). Valid uncertainty intervals are obtained from sampling from the generated distribution and the use of MC (Monte Carlo) Dropout. All data necessary is available upon request. Any contributions to this repository and the NowcastPNN model are welcome.
 
 ## Table of Contents
 
