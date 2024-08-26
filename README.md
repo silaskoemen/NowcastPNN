@@ -2,8 +2,11 @@
 
 This repository contains all code required for reproducing the results corresponding to the thesis paper titled "Attention-Based Probabilistic Neural Networks for Nowcasting of Dengue Fever in Brazil". The paper proposes a novel neural network (NN) structure, based on the popular attention mechanism and outputs a distribution over the target variable instead of a single point prediction (hence the name probabilistic). Valid uncertainty intervals are obtained from sampling from the generated distribution and the use of MC (Monte Carlo) Dropout. All data necessary is available upon request. Any contributions to this repository and the NowcastPNN model are welcome.
 
-![Alt text](./outputs/figures/comparison_sameday_nowcast.svg)
-<img src="./outputs/figures/comparison_sameday_nowcast.svg">
+The plot below illustrates the strenghts of the NowcastPNN. For same day nowcasts on unseen data, the estimates from the NowcastPNN are much closer to the true values, while having narrower (more precise) confidence intervals.
+<img src="./outputs/figures/comparison_sameday_nowcast_2018-12-23_2019-07-11.svg">
+
+To compare the benchmark models (Epinowcast and RIVM) to the NowcastPNN the Interval Score (IS) and Weighted IS (WIS) can be used, as seen below, where the NowcastPNN has significantl lower values and less spread than the other models.
+<img src="./outputs/figures/is_decomp_wis_rec.svg">
 
 ## Table of Contents
 
@@ -16,7 +19,7 @@ This repository contains all code required for reproducing the results correspon
 
 ## Data
 
-The dataset used in this project is sourced from the Brazilian Health Ministry (Ministério da saúde) and its associated DATASUS service. For this analysis, data on Dengue incidences in São Paulo from years 2013 to 2020 were used.
+The dataset used in this project is sourced from the Brazilian Ministry of Health (Ministério da saúde) and its associated DATASUS service. For this analysis, data on Dengue incidences in São Paulo from years 2013 to 2020 were used.
 
 ## Outputs
 
