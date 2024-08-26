@@ -43,7 +43,7 @@ def postprocess_rivm_level(level_dict, levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 
         level_dict[l] = lower, upper
     return level_dict
 
-def date_to_level_dict(date_dict, levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], level_idcs = {0: 0, 0.05: 1, 0.1: 2, 0.25: 3, 0.5: 4, 0.75: 5, 0.9: 6, 0.95: 7, 1: 8}):
+def date_to_level_dict(date_dict, levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], level_idcs = {0: 0, 0.05: 1, 0.1: 2, 0.25: 3, 0.5: 4, 0.75: 5, 0.9: 6, 0.95: 7, 1: 8}, future_obs = 0):
 
     # Initialize the new dictionary
     level_dict = {level: [] for level in levels}
@@ -54,7 +54,7 @@ def date_to_level_dict(date_dict, levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 
             # Extract the index for the current level
             idx = level_idcs[level]
             # Get the lower and upper bounds (same-day, first row)
-            bounds = array[0, idx, :]
+            bounds = array[future_obs, idx, :]
             # Append to the corresponding list in the new dictionary
             level_dict[level].append(bounds)
 
@@ -96,6 +96,8 @@ def IS(levels: list[float], intervals: dict, y: np.ndarray): #Y NOT PREDS
 def WIS(levels: list[float], intervals: dict, y: np.ndarray, pred_med: np.ndarray):
     """ Weighted Interval Score. Requires predictive median as well. """
     wis_scores = np.zeros((len(levels)))
+    if len(y.shape) > 1:
+        y = y.flatten()
     for i, l in enumerate(levels):
         lower, upper = intervals[l]
         assert lower.shape[0] == y.shape[0], "Length of lower bounds needs to match length of predictions"
@@ -108,26 +110,24 @@ def WIS(levels: list[float], intervals: dict, y: np.ndarray, pred_med: np.ndarra
     print(f"WIS: {score}")
     return score
 
-def WIS_indiv(levels: list[float], intervals: dict, y, pred_med):
-    pass
-
-
 def IS_decomposed(levels: list[float], intervals: dict, y: np.ndarray):
     """ IS score, now calculated in the formulation that yields spread, over- and underprediction. """
 
     ## Return over-, under- and spread as well as individual things
     is_scores = np.zeros((4, len(levels))) # underpred, spread, overpred, total
+    if len(y.shape) > 1:
+        y = y.flatten()
     for i, l in enumerate(levels):
         lower, upper = intervals[l]
         assert lower.shape[0] == y.shape[0], "Length of lower bounds needs to match length of predictions"
         assert upper.shape[0] == y.shape[0], "Length of upper bounds needs to match length of predictions"
-        under_mask, over_mask = y <= lower, y >= upper
-        under_pen = 2/(1-l)*np.sum(lower[under_mask] - y[under_mask])/len(y) if not np.all(under_mask == False) else 0
-        over_pen = 2/(1-l)*np.sum(y[over_mask] - upper[over_mask])/len(y) if not np.all(over_mask == False) else 0
-        is_scores[0, i] = under_pen
+        y_under_mask, y_over_mask = y <= lower, y >= upper
+        over_pred = 2/(1-l)*np.sum(lower[y_under_mask] - y[y_under_mask])/len(y) if not np.all(y_under_mask == False) else 0
+        under_pred = 2/(1-l)*np.sum(y[y_over_mask] - upper[y_over_mask])/len(y) if not np.all(y_over_mask == False) else 0
+        is_scores[0, i] = under_pred
         is_scores[1, i] = np.mean(upper - lower)
-        is_scores[2, i] = over_pen
-        is_scores[3, i] = np.mean(upper - lower) + under_pen + over_pen
+        is_scores[2, i] = over_pred
+        is_scores[3, i] = np.mean(upper - lower) + over_pred + under_pred
     is_scores = np.mean(is_scores, axis = 1)
     print(f"IS: under = {is_scores[0]} | spread = {is_scores[1]} | over = {is_scores[2]} | total = {is_scores[3]}")
     return is_scores
@@ -250,7 +250,7 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     IS(levels, intervals_dict, y)
     IS_decomposed(levels, intervals_dict, y)
 
-def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save = False, random_split=False, dow = False):
+def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save = False, random_split=False, dow = False, biggest_outbreak = False):
     mat, y = next(iter(test_loader))
     if dow:
         mat, dow_val = mat
@@ -275,8 +275,12 @@ def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5,
     intervals_dict[1] = (min_preds, max_preds)
 
     if save:
-        with open(f'../data/model_predictions/nowcast_pnn_dict{"_recent" if not random_split else ""}{"_dow" if dow else ""}.pkl', 'wb') as f:
-            pickle.dump(intervals_dict, f)
+        if biggest_outbreak:
+            with open(f'../data/model_predictions/nowcast_pnn_dict_biggest{"_dow" if dow else ""}.pkl', 'wb') as f:
+                pickle.dump(intervals_dict, f)
+        else:
+            with open(f'../data/model_predictions/nowcast_pnn_dict{"_recent" if not random_split else ""}{"_dow" if dow else ""}.pkl', 'wb') as f:
+                pickle.dump(intervals_dict, f)
 
     return intervals_dict
 
@@ -323,17 +327,17 @@ def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.
     if not total:
         y = y.sum(axis = 1)
 
-    min_preds, max_preds = intervals_dict[1] # 100% PI, meaning max and min
+    if len(y.shape) == 2:
+        y = np.squeeze(y)
+
+    #min_preds, max_preds = intervals_dict[1] # 100% PI, meaning max and min
     pred_median = intervals_dict[0] # 0% PI, meaning median
-
-    cov_dict, wis_dict = {}, {}
-
 
     cov_dict = coverages(levels, intervals_dict, y)
     pica = PICA(levels, intervals_dict, y)
     #cwc = CWC(levels, (min_preds, max_preds), intervals_dict, y)
     wis = WIS(levels, intervals_dict, y, pred_med=pred_median)
-    IS(levels, intervals_dict, y)
+    #IS(levels, intervals_dict, y)
     is_decomp = IS_decomposed(levels, intervals_dict, y)
 
     ## Think about having dictionary, where each element is set

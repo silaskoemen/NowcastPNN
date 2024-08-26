@@ -3,7 +3,7 @@ import torch
 from NegativeBinomial import NegBin as NB
 
 ## For matrix-like (two-dimensional) input data
-class NowcastPNNDaily(nn.Module):
+class NowcastPNN(nn.Module):
     def __init__(self, past_units = 30, max_delay = 40, hidden_units = [16, 8], conv_channels = [10, 1, 1]):
         super().__init__()
         self.past_units = past_units
@@ -60,7 +60,7 @@ class NowcastPNNDaily(nn.Module):
         #dist = torch.distributions.Poisson(rate=self.const*self.softplus(x))
         return torch.distributions.Independent(dist, reinterpreted_batch_ndims=1)
 
-## For summed (one-dimensional) input data
+"""## For summed (one-dimensional) input data
 class PNNSumDaily(nn.Module):
     def __init__(self, past_units = 45, max_delay = 45, n_layers = 3, hidden_units = [64, 32, 16]):
         super().__init__()
@@ -81,9 +81,6 @@ class PNNSumDaily(nn.Module):
         self.bnorm1, self.bnorm2, self.bnorm3, self.bnorm4 = nn.BatchNorm1d(num_features=past_units), nn.BatchNorm1d(num_features=hidden_units[0]), nn.BatchNorm1d(num_features=hidden_units[1]), nn.BatchNorm1d(num_features=hidden_units[2])
         self.lnorm1, self.lnorm2, self.lnorm3, self.lnorm4 = nn.LayerNorm([1]), nn.LayerNorm([1]), nn.LayerNorm([1]), nn.LayerNorm([1])
         self.attn1 = nn.MultiheadAttention(embed_dim=1, num_heads=1, batch_first=True)
-        self.attn2 = nn.MultiheadAttention(embed_dim=1, num_heads=1, batch_first=True)
-        self.attn3 = nn.MultiheadAttention(embed_dim=1, num_heads=1, batch_first=True)
-        self.attn4 = nn.MultiheadAttention(embed_dim=1, num_heads=1, batch_first=True)
         self.drop1, self.drop2, self.drop3 = nn.Dropout(0.2), nn.Dropout(0.4), nn.Dropout(0.2)
         self.softplus = nn.Softplus()
         self.relu, self.silu = nn.ReLU(), nn.SiLU()
@@ -99,24 +96,6 @@ class PNNSumDaily(nn.Module):
         x = self.attfc1(x.permute(0, 2, 1))
         x = self.silu(x).permute(0, 2, 1)
         x = x + x_add
-        """x_add = x.clone()
-        x = self.lnorm2(x)
-        x = self.attn2(x, x, x, need_weights = False)[0]
-        x = self.attfc2(x.permute(0, 2, 1))
-        x = self.silu(x).permute(0, 2, 1)
-        x = x+x_add
-        x_add = x.clone()
-        x = self.lnorm3(x)
-        x = self.attn3(x, x, x, need_weights = False)[0]
-        x = self.attfc3(x.permute(0, 2, 1))
-        x = self.silu(x).permute(0, 2, 1)
-        x = x+x_add
-        x_add = x.clone()
-        x = self.lnorm4(x)
-        x = self.attn4(x, x, x, need_weights = False)[0]
-        x = self.attfc4(x.permute(0, 2, 1))
-        x = self.silu(x).permute(0, 2, 1)
-        x = x+x_add"""
         x = x.permute(0, 2, 1) # [batch, past_units, 1] -> [batch, 1, past_units], so can take past_units
         x = torch.squeeze(x)
         x = self.silu(self.fc3(self.bnorm1(x)))
@@ -128,19 +107,10 @@ class PNNSumDaily(nn.Module):
         x = self.fcnb(self.bnorm4(x))
         #dist = torch.distributions.Poisson(rate=1000*self.softplus(x))
         dist = NB(lbda = self.const*self.softplus(x[:, 0]), phi = self.const**2*self.softplus(x[:, 1])+1e-5)
-        return torch.distributions.Independent(dist, reinterpreted_batch_ndims=1)
-
-#nowcast_pnn_dow = None # run once and save
-## Let it train once, then keep embedding and freeze them, from pre-trained, save somewhere
-#torch.save(nowcast_pnn_dow.embed.weight, f"./weights/embedding_weights")
-
-import torch.nn as nn
-import torch
-from NegativeBinomial import NegBin as NB
-## For matrix-like (two-dimensional) input data
+        return torch.distributions.Independent(dist, reinterpreted_batch_ndims=1)"""
 class NowcastPNNDOW(nn.Module):
     """ Still NowcastPNN, just this time processing the day of the week additionally to reporting triangle """
-    def __init__(self, past_units = 40, max_delay = 40, hidden_units = [16, 8], conv_channels = [16, 1], embedding_dim = 10, load_embed = True):
+    def __init__(self, past_units = 40, max_delay = 40, hidden_units = [16, 8], conv_channels = [16, 1], embedding_dim = 10, load_embed = True, dropout_probs = [0.15, 0.1]):
         super().__init__()
         self.past_units = past_units
         self.max_delay = max_delay
@@ -169,7 +139,7 @@ class NowcastPNNDOW(nn.Module):
         #self.bnorm7 = nn.BatchNorm1d(num_features=hidden_units[1])
         self.bnorm_final = nn.BatchNorm1d(num_features=hidden_units[-1]) #hidden_units[1]/self.past_units for single model
         self.attn1 = nn.MultiheadAttention(embed_dim=self.max_delay, num_heads=1, batch_first=True)
-        self.drop1, self.drop2 = nn.Dropout(0.3), nn.Dropout(0.1) 
+        self.drop1, self.drop2 = nn.Dropout(dropout_probs[0]), nn.Dropout(dropout_probs[1]) 
         self.softplus = nn.Softplus()
         self.act = nn.SiLU()
     
@@ -183,7 +153,6 @@ class NowcastPNNDOW(nn.Module):
     def forward(self, rep_tri, dow): ## Feed forward function, takes input of shape [batch, past_units, max_delay]
         #x = x.permute(0, 2, 1) # [batch, past_units, max_delay] -> [batch, max_delay, past_units]
         x = rep_tri.float()
-
         ## Attention Block ##
         x_add = x.clone()
         x = self.attn1(x, x, x, need_weights = False)[0]
@@ -197,9 +166,8 @@ class NowcastPNNDOW(nn.Module):
         #x = self.act(self.conv3(self.bnorm3(x)))
         #x = self.act(self.conv4(self.bnorm4(x)))
         x = torch.squeeze(x, 1)
-        #print(x)
         ## Addition of embedding of day of the week ##
-        if len(dow.size()) < 2:
+        if len(dow.size()) == 0:
             dow = torch.unsqueeze(dow, 0)
         embedded = self.embed(dow)
         #print(embedded)
@@ -213,8 +181,4 @@ class NowcastPNNDOW(nn.Module):
         #x = self.act(self.fc5(self.bnorm7(x)))
         x = self.fcnb(self.bnorm_final(x))
         dist = NB(lbda = self.const*self.softplus(x[:, 0]), phi = (self.const**2)*self.softplus(x[:, 1])+1e-5)
-        """
-        x = self.fcpoi(self.bnorm_final(x))
-        dist = Poi(rate=self.const*self.softplus(x)+1e-5)
-        """
         return torch.distributions.Independent(dist, reinterpreted_batch_ndims=1)

@@ -19,7 +19,7 @@ models = ["Epinowcast", "RIVM", "NowcastPNN"]
 colors = ['dodgerblue', 'black', 'crimson']
 
 ## Make plot over entire dataset for desired confidence level
-def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], weeks = True, xlims = None, random_split = True, test_idcs = None, total = True, dow = False):
+def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], weeks = False, xlims = None, random_split = True, test_idcs = None, total = True, dow = False):
     plotloader = DataLoader(dataset, batch_size=dataset.__len__(), shuffle=False)
     mat, y = next(iter(plotloader))
     if dow:
@@ -223,6 +223,107 @@ def plot_wis(epi_scores, rivm_scores, pnn_scores):
     plt.savefig(f"../outputs/figures/wis")
     plt.show()
 
+def plot_coverages_pica(epi_dict, rivm_dict, pnn_dict, levels = [0.5, 0.95], save = False, random_split = True):
+    colors_50 = ['dodgerblue', 'black', 'crimson']
+    colors_95 = ['dodgerblue', 'black', 'crimson']
+
+    coverages_lower =  [epi_dict["coverages"][min(levels)], rivm_dict["coverages"][min(levels)], pnn_dict["coverages"][min(levels)]]
+    coverages_higher = [epi_dict["coverages"][max(levels)], rivm_dict["coverages"][max(levels)], pnn_dict["coverages"][max(levels)]]
+
+    y_pos = np.arange(len(models))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 3.5))  # Reduced height
+
+    for i in range(len(models)):
+        ax1.barh(y_pos[i], coverages_lower[i], color=colors_50[i], alpha=1.0, height=0.4, label=f'{int(100*min(levels))}% Coverage' if i == 1 else '', zorder=3)
+        ax1.barh(y_pos[i], coverages_higher[i], color=colors_95[i], alpha=0.5, height=0.4, label=f'{int(100*max(levels))}% Coverage' if i == 1 else '', zorder=2)
+
+    ax1.set_yticks(y_pos)
+    ax1.set_yticklabels(models, fontsize="x-large")
+    ax1.set_xlabel('Coverage', fontsize="x-large")
+    ax1.set_xticks([0, 0.25, 0.5, 0.75, 1])
+
+    ## Add minor ticks (for grid) but do not show them (empty labels)
+    ax1ticks = np.arange(0, 1.01, 0.125)
+    ax1ticks = np.delete(ax1ticks, ax1ticks == 0.5)
+    ax1.set_xticks(ax1ticks, minor=True)
+    ax1.tick_params(which='minor', length=0)
+
+    ## Add dashed lines at 0.5 and 0.95 with high zorder to appear above grid lines
+    ax1.axvline(0.5, color='black', linestyle='--', linewidth=1.2, zorder=4)
+    ax1.axvline(0.95, color='black', linestyle='--', linewidth=1.2, zorder=4)
+
+    ## Add grid for both major and minor ticks with lower zorder to be below the bars
+    ax1.grid(True, alpha=0.2, zorder=1)
+    ax1.grid(True, which='minor', alpha=0.2, zorder=1)
+
+    ## Move the legend outside the plot
+    for text in ax1.legend().get_texts():
+        text.set_color("black")
+    ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, frameon=False)
+
+
+    pica_scores  = [epi_dict["pica"], rivm_dict["pica"], pnn_dict["pica"]]
+        # Positions for the bars on the x-axis
+    x_pos = np.arange(len(models))
+
+    # Plot vertical bars
+    ax2.bar(x_pos, pica_scores, color=colors, zorder = 2, width=0.6)
+
+    # Set the x-ticks with the model names
+    ax2.set_xticks(x_pos)
+    ax2.set_ylabel("PICA Score", fontsize="x-large")
+    ax2.set_xticklabels(models, fontsize="x-large")
+
+    # Add grid lines
+    ax2.grid(True, axis='y', alpha=0.2, zorder=1)
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"../outputs/figures/coverages_pica{'_rec' if not random_split else ''}.svg")
+    plt.show()
+
+def plot_is_decomp_wis(epi_score_dict, rivm_score_dict, pnn_score_dict, save = False, random_split = True):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (10, 3.5))
+    y_pos = np.arange(len(models))
+    bar_width = 0.35
+
+
+    ax1.barh(y_pos[0], epi_score_dict["is"][0], color="dodgerblue", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+    ax1.barh(y_pos[0], epi_score_dict["is"][1], left=epi_score_dict["is"][0], color="aliceblue", height = bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+    ax1.barh(y_pos[0], epi_score_dict["is"][2], left=epi_score_dict["is"][0] + epi_score_dict["is"][1], color="deepskyblue", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+    ax1.barh(y_pos[1], rivm_score_dict["is"][0], color="black", height=bar_width, label='Underpred.', zorder=3, edgecolor = "black", linewidth = 0.4)
+    ax1.barh(y_pos[1], rivm_score_dict["is"][1], left=rivm_score_dict["is"][0], color="gainsboro", height=bar_width, label='Spread', zorder=3, edgecolor = "black", linewidth = 0.4)
+    ax1.barh(y_pos[1], rivm_score_dict["is"][2], left=rivm_score_dict["is"][0] + rivm_score_dict["is"][1], color="grey", height=bar_width, label='Overpred.', zorder=3, edgecolor = "black", linewidth = 0.4)
+    ax1.barh(y_pos[2], pnn_score_dict["is"][0], color="crimson", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+    ax1.barh(y_pos[2], pnn_score_dict["is"][1], left=pnn_score_dict["is"][0], color="mistyrose", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+    ax1.barh(y_pos[2], pnn_score_dict["is"][2], left=pnn_score_dict["is"][0] + pnn_score_dict["is"][1], color="#f5626e", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+
+
+    ax1.set_yticks(y_pos)
+    ax1.set_yticklabels(models, fontsize="x-large")
+    ax1.set_xlabel('IS Decomposition', fontsize="x-large")
+    ax1.grid(True, alpha=0.4, zorder=1)
+    ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.17), ncol=3, frameon=False)
+
+    wis_scores  = [epi_score_dict["wis"], rivm_score_dict["wis"], pnn_score_dict["wis"]]
+    # Positions for the bars on the x-axis
+    x_pos = np.arange(len(models))
+
+    # Plot vertical bars
+    ax2.bar(x_pos, wis_scores, color=colors, zorder = 2, width=0.55)
+
+    # Set the x-ticks with the model names
+    ax2.set_xticks(x_pos)
+    ax2.set_ylabel("WIS", fontsize="x-large")
+    ax2.set_xticklabels(models, fontsize="x-large")
+
+    # Add grid lines
+    ax2.grid(True, axis='y', alpha=0.2, zorder=1)
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"../outputs/figures/is_decomp_wis{'_rec' if not random_split else ''}.svg")
+    plt.show()
+
 def plot_pica(epi_scores, rivm_scores, pnn_scores):
     """ Plot vertical bar charts to visualize the PI Coverage Accuracies scores achieved by all models. """
     scores  = [epi_scores, rivm_scores, pnn_scores]
@@ -242,6 +343,73 @@ def plot_pica(epi_scores, rivm_scores, pnn_scores):
 
     plt.tight_layout()
     plt.savefig(f"../outputs/figures/pica")
+    plt.show()
+
+
+def plot_sameday_nowcast_recent(test_loader, test_idcs, levels_pnn, levels_epi, levels_rivm, save = False, xlims = None):
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
+    if xlims is not None:
+        xlims = [datetime.strptime(xlims[0], "%Y-%m-%d"), datetime.strptime(xlims[1], "%Y-%m-%d")]
+    _, y = next(iter(test_loader))
+    y = y.to("cpu").numpy()
+
+    dates = [days_to_date("2013-01-01", days, past_units=40) for days in test_idcs]
+        
+    # Create a DataFrame
+    date_df = pd.DataFrame({'Date': dates})
+
+    # Plot PNN model results
+    axs[0].plot(date_df.Date, y, label='True Count', color='black')
+    axs[0].plot(date_df.Date, levels_pnn[0], label='Median of nowcasted predictions', color='crimson')
+
+    # Fill between for the confidence intervals
+    for l in [0.5, 0.95]:
+        lower, upper = levels_pnn[l]
+        axs[0].fill_between(date_df.Date, lower, upper, color='crimson', alpha=-l*2/9+0.4, label=f'{int(100*l)}% CI')
+
+    axs[0].set_title('NowcastPNN', fontsize="x-large")
+    axs[0].set_xlabel('Date', fontsize="x-large")
+    axs[0].tick_params(axis='x', labelrotation = 25)
+    axs[0].set_ylabel('Counts', fontsize="x-large")
+    axs[0].legend(loc = "upper left")
+
+    ## Epinowcast
+    axs[1].plot(date_df.Date, y, label='True Count', color='black')
+    axs[1].plot(date_df.Date, levels_epi[0], label='Predicted Median', color='dodgerblue')
+
+    # Fill between for the confidence intervals
+    for l in [0.5, 0.95]:
+        lower, upper = levels_epi[l]
+        axs[1].fill_between(date_df.Date, lower, upper, color='dodgerblue', alpha=-l*2/9+0.4, label=f'{int(100*l)}% CI')
+
+    axs[1].set_title('Epinowcast', fontsize="x-large")
+    axs[1].set_xlabel('Date', fontsize="x-large")
+    axs[1].tick_params(axis='x', labelrotation = 25)
+
+    ## RIVM
+    axs[2].plot(date_df.Date, y, label='True Count', color='black')
+    axs[2].plot(date_df.Date, levels_rivm[0], label='Predicted Median', color='grey')
+
+    # Fill between for the confidence intervals
+    for l in [0.5, 0.95]:
+        lower, upper = levels_rivm[l]
+        axs[2].fill_between(date_df.Date, lower, upper, color='grey', alpha=-l*2/9+0.4, label=f'{int(100*l)}% CI')
+
+    axs[2].set_title('RIVM', fontsize="x-large")
+    axs[2].set_xlabel('Date', fontsize="x-large")
+    axs[2].tick_params(axis='x', labelrotation = 25)
+    if xlims is not None:
+        axs[0].set_xlim(xlims)
+        axs[1].set_xlim(xlims)
+        axs[2].set_xlim(xlims)
+
+    # Adjust layout
+    plt.tight_layout()
+    if save:
+        if xlims is not None:
+            plt.savefig(f"../outputs/figures/comparison_sameday_nowcast_{xlims[0].strftime('%Y-%m-%d')}_{xlims[1].strftime('%Y-%m-%d')}.svg")
+        else:
+            plt.savefig("../outputs/figures/comparison_sameday_nowcast.svg")
     plt.show()
 
 
@@ -358,15 +526,15 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
         mat, dow_val = mat
         dow_val = dow_val.to("cpu")
     mat, y = torch.unsqueeze(mat.to("cpu"), 0), y.to("cpu").numpy()
-    preds = np.zeros((future_obs, n_samples)) # 7x200
+    preds = np.zeros((future_obs+1, n_samples)) # 7x200
     y_vals = []
 
     #x_vals = [*range(idx_current-future_obs+1, idx_current+1)]
-    for p in range(idx_current-future_obs+1, idx_current): # know last one from above, would add padding outside of them
+    for p in range(idx_current-future_obs, idx_current): # know last one from above, would add padding outside of them
         y_vals.append(dataset[p][1].cpu().numpy())
     y_vals.append(y)
 
-    x_min, x_max = idx_current-future_obs+1, idx_current
+    x_min, x_max = idx_current-future_obs, idx_current
     if left:
         x_min = idx_current - future_obs + 1 - padding_val
         for l in range(idx_current-future_obs, idx_current-future_obs-padding_val, -1):
@@ -378,23 +546,145 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
     
 
     dates = [days_to_date("2013-01-01", days, past_units) for days in range(x_min, x_max+1)]
+
     cur_date = days_to_date("2013-01-01", idx, past_units)
     
     # Create a DataFrame
     date_df = pd.DataFrame({'Date': dates})
     
-    for f in range(future_obs):
+    for f in range(future_obs+1):
         model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}{'-rec' if not random_split else ''}{'-dow' if dow else ''}"))
         for i in range(n_samples):
             if dow:
                 preds[f, i] = model(mat, dow_val).sample().numpy()
             else:
                 preds[f, i] = model(mat).sample().numpy()
+    preds = preds[::-1, :]
     preds_mean = np.quantile(preds, 0.5, axis=1)
     
     intervals_dict = {}
     for l in levels:
         intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
+    plt.figure(figsize=(12, 7))
+    plt.plot(date_df["Date"], y_vals, label="True count", c = "black") # [*range(x_min, x_max+1)]
+    plt.plot(date_df["Date"].iloc[(padding_val):(padding_val+future_obs+1)], preds_mean, label = "Median nowcasted predictions", c = "crimson", alpha = 0.75) # [*range(idx_current-future_obs+1, idx_current+1)]
+    for l in levels:
+        lower, upper = intervals_dict[l]
+        plt.fill_between(date_df["Date"].iloc[(padding_val):(padding_val+future_obs+1)], lower, upper, color = "crimson", alpha = 0.2, label = f"{int(100*l)}% CI")
+    plt.grid(alpha=.2)
+    plt.axvline(cur_date, color = "black", linestyle = "--", label = f"Current {'day' if not weeks else 'week'}")
+    plt.xlabel("Days")
+    plt.legend()
+    plt.ylabel("Number of cases")
+    if save:
+        plt.savefig(f"../outputs/figures/past_correction_{'week' if weeks else 'day'}_{idx_current}_fut{future_obs}")
+    plt.show()
+
+def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, dataset, rivm_dict, epi_dict, save = False, random_split = True, padding = "both", dow = False, padding_val = 0, n_samples = 200, levels = [0.5, 0.95], idx = 787):
+    model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std.
+    model.drop1.train() # keeps dropout layers active
+    model.drop2.train()
+    if padding is None or padding == "none": left, right = False, False
+    elif padding == "both": left, right = True, True
+    elif padding == "left": left, right = True, False
+    else: left, right = False, True
+
+    level_keys = {0: 0, 0.5: 4, 0.95: 7}
+
+    model = model.to("cpu")
+    idx_current = idx
+    mat, y = dataset[idx_current]
+    if dow:
+        mat, dow_val = mat
+        dow_val = dow_val.to("cpu")
+    mat, y = torch.unsqueeze(mat.to("cpu"), 0), y.to("cpu").numpy()
+    preds = np.zeros((future_obs+1, n_samples))
+    y_vals = []
+
+    #x_vals = [*range(idx_current-future_obs+1, idx_current+1)]
+    for p in range(idx_current-future_obs, idx_current): # know last one from above, would add padding outside of them
+        y_vals.append(dataset[p][1].cpu().numpy())
+    y_vals.append(y)
+
+    x_min, x_max = idx_current-future_obs, idx_current
+    if left:
+        x_min -= padding_val
+        for l in range(idx_current-future_obs, idx_current-future_obs-padding_val, -1):
+            y_vals.insert(0, dataset[l][1].cpu().numpy())
+    if right:
+        x_max = idx_current + padding_val
+        for r in range(idx_current+1, idx_current+padding_val+1):
+            y_vals.append(dataset[r][1].cpu().numpy())
+
+    dates = [days_to_date("2013-01-01", days, past_units) for days in range(x_min, x_max+1)]
+    cur_date = days_to_date("2013-01-01", idx, past_units)
+    date_df = pd.DataFrame({'Date': dates})
+    
+    for f in range(future_obs+1):
+        model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}{'-rec' if not random_split else ''}{'-dow' if dow else ''}"))
+        for i in range(n_samples):
+            if dow:
+                preds[f, i] = model(mat, dow_val).sample().numpy()
+            else:
+                preds[f, i] = model(mat).sample().numpy()
+    preds = preds[::-1, :]
+    preds_median = np.quantile(preds, 0.5, axis=1)
+    
+    intervals_dict = {}
+    for l in levels:
+        intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
+    
+    epi_dict = epi_dict[(cur_date).strftime('%Y-%m-%d')]
+    rivm_dict = rivm_dict[(cur_date).strftime('%Y-%m-%d')]
+
+    # Set up the figure and axes for the subplots
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4.5), sharey=True)  # 1 row, 3 columns, shared y-axis
+    # Plot for Epinowcast
+    ax1.plot(date_df["Date"], y_vals, label="True count", c="black")
+    ax1.plot(date_df["Date"].iloc[(padding_val):padding_val+future_obs+2], epi_dict[:, 0, 0][::-1], label="Median nowcasted predictions", c="crimson", alpha=0.75)
+    for l in levels:
+        lower, upper = epi_dict[:, level_keys[l], 0][::-1], epi_dict[:, level_keys[l], 1][::-1]
+        ax1.fill_between(date_df["Date"].iloc[(padding_val):padding_val+future_obs+2], lower, upper, color="crimson", alpha=0.2, label=f"{int(100*l)}% CI")
+    ax1.grid(alpha=0.2)
+    ax1.tick_params(axis='x', labelrotation = 25)
+    ax1.axvline(cur_date, color="black", linestyle="--", label=f"Current {'day' if not weeks else 'week'}")
+    ax1.set_title("Epinowcast")
+
+    # Plot for NowcastPNN
+    ax2.plot(date_df["Date"], y_vals, label="True count", c="black")
+    ax2.plot(date_df["Date"].iloc[(padding_val):padding_val+future_obs+2], preds_median, label="Median nowcasted predictions", c="crimson", alpha=0.75)
+    for l in levels:
+        lower, upper = intervals_dict[l]
+        ax2.fill_between(date_df["Date"].iloc[(padding_val):padding_val+future_obs+2], lower, upper, color="crimson", alpha=0.2, label=f"{int(100*l)}% CI")
+    ax2.grid(alpha=0.2)
+    ax2.tick_params(axis='x', labelrotation = 25)
+    ax2.axvline(cur_date, color="black", linestyle="--", label=f"Current {'day' if not weeks else 'week'}")
+    ax2.set_title("NowcastPNN")
+
+    # Plot for RIVM
+    ax3.plot(date_df["Date"], y_vals, label="True count", c="black")
+    ax3.plot(date_df["Date"].iloc[(padding_val):padding_val+future_obs+2], rivm_dict[:, 0, 0][::-1], label="Median nowcasted predictions", c="crimson", alpha=0.75)
+    for l in levels:
+        lower, upper = rivm_dict[:, level_keys[l], 0][::-1], rivm_dict[:, level_keys[l], 1][::-1]
+        ax3.fill_between(date_df["Date"].iloc[(padding_val):padding_val+future_obs+2], lower, upper, color="crimson", alpha=0.2, label=f"{int(100*l)}% CI")
+    ax3.grid(alpha=0.2)
+    ax3.tick_params(axis='x', labelrotation = 25)
+    ax3.axvline(cur_date, color="black", linestyle="--", label=f"Current {'day' if not weeks else 'week'}")
+    ax3.set_title("RIVM")
+
+    # Set common labels
+    #fig.text(0.5, 0.04, "Date", ha="center", fontsize=14)
+    fig.text(0., 0.5, "Number of cases", va="center", rotation="vertical", fontsize=14)
+
+    # Add a legend only to the first subplot
+    ax1.legend()
+
+    # Show the plot
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"../outputs/figures/comparison_past_correction_{idx}.svg")
+    plt.show()
+"""
     plt.figure(figsize=(12, 7))
     plt.plot(date_df["Date"], y_vals, label="True count", c = "black") # [*range(x_min, x_max+1)]
     plt.plot(date_df["Date"].iloc[(padding_val):(padding_val+future_obs)], preds_mean, label = "Median nowcasted predictions", c = "crimson", alpha = 0.75) # [*range(idx_current-future_obs+1, idx_current+1)]
@@ -408,6 +698,303 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
     plt.ylabel("Number of cases")
     if save:
         plt.savefig(f"../outputs/figures/past_correction_{'week' if weeks else 'day'}_{idx_current}_fut{future_obs}")
+    plt.show()"""
+
+def compare_coverages(pnn_dict, epi_dict, rivm_dict):
+    """ If just single test run, make all in one plot against 45° line.
+    """
+    pass
+
+def compare_coverages_future_obs(pnn_coverages, epi_coverages, rivm_coverages, save = False):
+    """ 3x1 plot of coverages vs 45° per day of future obs to see how behaves.
+    """
+    
+    models = [epi_coverages, pnn_coverages, rivm_coverages]
+    model_names = ['Epinowcast', 'NowcastPNN', 'RIVM']
+
+    # Coverage levels
+    levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]
+
+    # Create 1x3 subplot
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+
+    # Color map
+    #colors = cm.plasma(np.linspace(0, 1, 14))  # Adjust for number of days (14)
+    #colors = ["crimson", "deepskyblue"]
+    #colors = ["deepskyblue", "darkgray", "black"]
+    colors = ["gold", "red", "black"]
+    n_bins = 14  # Number of color bins in the color map
+    cmap_name = 'red_blue'
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
+
+    for i, (model_coverage, ax) in enumerate(zip(models, axes)):
+        for day_idx, day_coverage in enumerate(model_coverage):
+            # Extract values for this day
+            actual_coverages = [day_coverage[level] for level in levels]
+            #colors = [cmap(i/14)]
+            ax.plot(levels, actual_coverages, marker='o', color=cmap(day_idx)[:3], label=f'Fut. obs.: {day_idx}')
+        
+        # Set title, labels, and x-ticks
+        ax.set_title(model_names[i])
+        ax.set_xlabel('Expected Coverage')
+        if i == 0: ax.set_ylabel('Actual Coverage')
+        ax.set_xticks(levels)
+        ax.set_yticks(levels)
+        ax.grid(True)
+        ax.tick_params(axis='x', labelrotation = 33)
+        ax.plot(levels, levels, linestyle = '--', color='black', linewidth = 3)  # 45° line
+
+        # Add legend only for the first plot
+        if i == 2:
+            ax.legend(title='Days', bbox_to_anchor=(1.025, 1.05), loc='upper left')
+
+    plt.tight_layout()
+    if save:
+        plt.savefig("../outputs/figures/coverages_comparison_future_obs_rec.svg")
+    plt.show()
+
+def plot_training_size_is_wis_covs(n_training, pnn_is_decomp, pnn_wis, pnn_coverages, save = False, random_split = True):
+    fig, axes = plt.subplots(1, 3, figsize=(11.3, 3.5))
+
+    temp_pnn_is = np.array(pnn_is_decomp)[:, -1]
+    temp_pnn_is[0] -= 8000
+    # IS Plot
+    axes[0].plot(n_training, temp_pnn_is, label='NowcastPNN', marker='o', c = "crimson", markersize=5)
+    axes[0].set_xlabel('Number of observations in training set', fontsize="x-large")
+    axes[0].set_ylabel('IS', fontsize="x-large")
+    axes[0].set_xlim(450, 2200)
+    axes[0].hlines(1112.1429236476092, xmin = 450, xmax = 2200, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
+    axes[0].hlines(974.3626620759587, xmin = 450, xmax = 2200, label = "RIVM", linestyle = "--", color = "black")
+    axes[0].set_yticks(range(0, 7000, 1000))
+    axes[0].set_yticklabels(["0", "1000", "2000", "3000", "...", "13000", "14000"]) 
+    axes[0].set_ylim(0)
+    axes[0].legend()
+    axes[0].text(x = 680, y = 3580, s = "//", color = "crimson", fontsize = 27)
+    axes[0].text(x = 636, y = 3005, s = "/", color = "white", fontsize = 132, zorder = 2)
+    axes[0].grid(alpha=.2, zorder = 3)
+
+    # WIS Plot
+    temp_wis = pnn_wis.copy()
+    temp_wis[0] -= 3000
+    axes[1].plot(n_training, temp_wis, label='NowcastPNN', marker='o', c = "crimson", markersize=5)
+    axes[1].set_xlabel('Number of observations in training set', fontsize="x-large")
+    axes[1].set_ylabel('WIS', fontsize="x-large")
+    axes[1].set_xlim(450, 2200)
+    axes[1].hlines(357.8707966239242, xmin = 450, xmax = 2200, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
+    axes[1].hlines(313.4214658136002, xmin = 450, xmax = 2200, label = "RIVM", linestyle = "--", color = "black")
+    axes[1].set_yticks(range(0, 3000, 500))
+    axes[1].set_yticklabels(["0", "500", "1000", "...", "5000", "5500"]) 
+    axes[1].text(x = 710, y = 1370, s = "//", color = "crimson", fontsize = 27)
+    axes[1].text(x = 635, y = 995, s = "/", color = "white", fontsize = 132, zorder = 2)
+    axes[1].set_ylim(0)
+    #axes[1].legend()
+    axes[1].grid(alpha=.2)
+
+    from matplotlib.colors import LinearSegmentedColormap
+    colors = ["gold", "red", "black"]
+    n_bins = len(n_training)  # Number of color bins in the color map
+    cmap_name = 'red_blue'
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
+    levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]
+    for n_idx, n_coverage in enumerate(pnn_coverages):
+        # Extract values for this day
+        actual_coverages = [n_coverage[level] for level in levels]
+        #colors = [cmap(i/14)]
+        axes[2].plot(levels, actual_coverages, marker='o', color=cmap(n_idx)[:3], label=f'{n_training[n_idx]}')
+        
+        # Set title, labels, and x-ticks
+        axes[2].set_xlabel('Expected Coverage', fontsize="x-large")
+        axes[2].set_ylabel('Actual Coverage', fontsize="x-large")
+        axes[2].set_xticks(levels)
+        axes[2].set_yticks(levels)
+        axes[2].grid(True)
+        axes[2].tick_params(axis='x', labelrotation = 45)
+        axes[2].plot(levels, levels, linestyle = '--', color='black', linewidth = 3)  # 45° line
+
+    axes[2].legend(title='Size train set', bbox_to_anchor=(1.025, 1.), loc='upper left')
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"../outputs/figures/training_size_metrics_rec.svg")
+    plt.show()
+
+def plot_training_size_is_wis_covs_rand(n_training, pnn_is_decomp, pnn_wis, pnn_coverages, save = False, random_split = True):
+    fig, axes = plt.subplots(1, 3, figsize=(11.3, 3.5))
+
+    axes[0].plot(n_training, np.array(pnn_is_decomp)[:, -1], label='NowcastPNN', marker='o', c = "crimson", markersize=5)
+    axes[0].set_xlabel('Number of observations in training set', fontsize="x-large")
+    axes[0].set_ylabel('IS', fontsize="x-large")
+    axes[0].set_xlim(450, 2200)
+    axes[0].hlines(949.9955032623753, xmin = 450, xmax = 2200, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
+    axes[0].hlines(781.4161973734148, xmin = 450, xmax = 2200, label = "RIVM", linestyle = "--", color = "black")
+    axes[0].set_ylim(0)
+    axes[0].legend(loc = "lower left")
+    axes[0].grid(alpha=.2, zorder = 3)
+
+    # WIS Plot
+    axes[1].plot(n_training, pnn_wis, label='NowcastPNN', marker='o', c = "crimson", markersize=5)
+    axes[1].set_xlabel('Number of observations in training set', fontsize="x-large")
+    axes[1].set_ylabel('WIS', fontsize="x-large")
+    axes[1].set_xlim(450, 2200)
+    axes[1].hlines(305.22665527302786, xmin = 450, xmax = 2200, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
+    axes[1].hlines(250.3374279725725, xmin = 450, xmax = 2200, label = "RIVM", linestyle = "--", color = "black")
+    axes[1].set_ylim(0)
+    #axes[1].legend()
+    axes[1].grid(alpha=.2)
+
+    from matplotlib.colors import LinearSegmentedColormap
+    colors = ["gold", "red", "black"]
+    n_bins = len(n_training)  # Number of color bins in the color map
+    cmap_name = 'red_blue'
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
+    levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]
+    for n_idx, n_coverage in enumerate(pnn_coverages):
+        # Extract values for this day
+        actual_coverages = [n_coverage[level] for level in levels]
+        #colors = [cmap(i/14)]
+        axes[2].plot(levels, actual_coverages, marker='o', color=cmap(n_idx)[:3], label=f'{n_training[n_idx]}')
+        
+        # Set title, labels, and x-ticks
+        axes[2].set_xlabel('Expected Coverage', fontsize="x-large")
+        axes[2].set_ylabel('Actual Coverage', fontsize="x-large")
+        axes[2].set_xticks(levels)
+        axes[2].set_yticks(levels)
+        axes[2].grid(True)
+        axes[2].tick_params(axis='x', labelrotation = 45)
+        axes[2].plot(levels, levels, linestyle = '--', color='black', linewidth = 3)  # 45° line
+
+    axes[2].legend(title='Size train set', bbox_to_anchor=(1.025, 1.), loc='upper left')
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"../outputs/figures/training_size_metrics.svg")
+    plt.show()
+
+def plot_past_units_is_wis_covs(n_past_units, pnn_is_decomp, pnn_wis, pnn_coverages, save = False, random_split = True):
+    fig, axes = plt.subplots(1, 3, figsize=(11, 3.5))
+
+    # IS Plot
+    axes[0].plot(n_past_units, np.array(pnn_is_decomp)[:, -1], label='NowcastPNN', marker='o', c = "crimson", markersize=5)
+    axes[0].set_xlabel('Past units used for estimation', fontsize="x-large")
+    axes[0].set_ylabel('IS', fontsize="x-large")
+    axes[0].set_xlim(0, 42)
+    if random_split:
+        axes[0].hlines(949.9955032623753, xmin = -2, xmax = 42, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
+        axes[0].hlines(781.4161973734148, xmin = -2, xmax = 42, label = "RIVM", linestyle = "--", color = "black")
+        axes[0].set_ylim(0, 1000)
+    else:
+        axes[0].hlines(1112.1429236476092, xmin = -2, xmax = 42, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
+        axes[0].hlines(974.3626620759587, xmin = -2, xmax = 42, label = "RIVM", linestyle = "--", color = "black")
+        axes[0].set_ylim(0)
+    axes[0].legend()
+    axes[0].grid(alpha=.2, zorder = 3)
+
+    # WIS Plot
+    axes[1].plot(n_past_units, pnn_wis, label='NowcastPNN', marker='o', c = "crimson", markersize=5)
+    axes[1].set_xlabel('Past units used for estimation', fontsize="x-large")
+    axes[1].set_ylabel('WIS', fontsize="x-large")
+    axes[1].set_xlim(0, 42)
+    if random_split:
+        axes[1].hlines(305.22665527302786, xmin = -2, xmax = 42, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
+        axes[1].hlines(250.3374279725725, xmin = -2, xmax = 42, label = "RIVM", linestyle = "--", color = "black")
+    else:
+        axes[1].hlines(357.8707966239242, xmin = -2, xmax = 42, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
+        axes[1].hlines(313.4214658136002, xmin = -2, xmax = 42, label = "RIVM", linestyle = "--", color = "black")
+    axes[1].set_ylim(0)
+    #axes[1].legend()
+    axes[1].grid(alpha=.2)
+
+    from matplotlib.colors import LinearSegmentedColormap
+    colors = ["gold", "red", "black"]
+    n_bins = len(n_past_units)  # Number of color bins in the color map
+    cmap_name = 'red_blue'
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=n_bins)
+    levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]
+    for n_idx, n_coverage in enumerate(pnn_coverages):
+        # Extract values for this day
+        actual_coverages = [n_coverage[level] for level in levels]
+        #colors = [cmap(i/14)]
+        axes[2].plot(levels, actual_coverages, marker='o', color=cmap(n_idx)[:3], label=f'{n_past_units[n_idx]}')
+        
+        # Set title, labels, and x-ticks
+        axes[2].set_xlabel('Expected Coverage', fontsize="x-large")
+        axes[2].set_ylabel('Actual Coverage', fontsize="x-large")
+        axes[2].set_xticks(levels)
+        axes[2].set_yticks(levels)
+        axes[2].grid(True)
+        axes[2].tick_params(axis='x', labelrotation = 45)
+        axes[2].plot(levels, levels, linestyle = '--', color='black', linewidth = 3)  # 45° line
+
+    axes[2].legend(title='Past units', bbox_to_anchor=(1.025, 1.), loc='upper left')
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"../outputs/figures/past_units_metrics{'_rec' if not random_split else ''}.svg")
+    plt.show()
+
+def plot_is_wis_future_obs(pnn_is_decomp, epi_is_decomp, rivm_is_decomp, pnn_wis, epi_wis, rivm_wis, save = False):
+    # Create 2x1 subplot
+    fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.5))
+
+    # IS Score Plot
+    axes[0].plot(np.array(pnn_is_decomp)[:, -1], label='NowcastPNN', marker='o', c = "crimson", markersize=5)
+    axes[0].plot(np.array(epi_is_decomp)[:, -1], label='Epinowcast', marker='o', c= "dodgerblue", markersize=5)
+    axes[0].plot(np.array(rivm_is_decomp)[:, -1], label='RIVM', marker='o', c="black", markersize=5)
+    #axes[0].set_title('IS Score Over Time')
+    axes[0].set_xlabel('Future observations (days)', fontsize="x-large")
+    axes[0].set_xticks(range(0, 14, 2))
+    axes[0].set_ylabel('IS', fontsize="x-large")
+    axes[0].legend()
+    axes[0].grid(alpha=.2)
+
+    y_pos = np.arange(len(models))
+    bar_width = 0.35
+
+    for i, scores in enumerate(zip(np.array(epi_is_decomp)[(0, -1), :], np.array(rivm_is_decomp)[(0, -1), :], np.array(pnn_is_decomp)[(0, -1), :])):
+        epi_scores, rivm_scores, pnn_scores = scores
+        if i == 0:
+            axes[1].barh(y_pos[0] + bar_width / 2, epi_scores[0], color="dodgerblue", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[0] + bar_width / 2, epi_scores[1], left=epi_scores[0], color="aliceblue", height = bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[0] + bar_width / 2, epi_scores[2], left=epi_scores[0] + epi_scores[1], color="deepskyblue", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[1] + bar_width / 2, rivm_scores[0], color="black", height=bar_width, label='Underpred.', zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[1] + bar_width / 2, rivm_scores[1], left=rivm_scores[0], color="gainsboro", height=bar_width, label='Spread', zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[1] + bar_width / 2, rivm_scores[2], left=rivm_scores[0] + rivm_scores[1], color="grey", height=bar_width, label='Overpred.', zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[2] + bar_width / 2, pnn_scores[0], color="crimson", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[2] + bar_width / 2, pnn_scores[1], left=pnn_scores[0], color="mistyrose", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[2] + bar_width / 2, pnn_scores[2], left=pnn_scores[0] + pnn_scores[1], color="#f5626e", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+        else:
+            axes[1].barh(y_pos[0] - bar_width / 2, epi_scores[0], color="dodgerblue", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[0] - bar_width / 2, epi_scores[1], left=epi_scores[0], color="aliceblue", height=bar_width, alpha=1, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[0] - bar_width / 2, epi_scores[2], left=epi_scores[0] + epi_scores[1], color="deepskyblue", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.5)
+            axes[1].barh(y_pos[1] - bar_width / 2, rivm_scores[0], color="black", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[1] - bar_width / 2, rivm_scores[1], left=rivm_scores[0], color="gainsboro", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[1] - bar_width / 2, rivm_scores[2], left=rivm_scores[0] + rivm_scores[1], color="grey", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[2] - bar_width / 2, pnn_scores[0], color="crimson", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[2] - bar_width / 2, pnn_scores[1], left=pnn_scores[0], color="mistyrose", height=bar_width, edgecolor = "black", linewidth = 0.4)
+            axes[1].barh(y_pos[2] - bar_width / 2, pnn_scores[2], left=pnn_scores[0] + pnn_scores[1], color="#f5626e", height=bar_width, edgecolor = "black", linewidth = 0.4)
+        
+    axes[1].set_yticks(y_pos)
+    axes[1].set_yticklabels(models, fontsize="x-large")
+    axes[1].set_xlabel('IS Decomposition', fontsize="x-large")
+    axes[1].grid(True, alpha=0.4, zorder=1)
+    axes[1].text(x = 790,y = 2.127, s = "same-day", fontsize = 10, bbox=dict(facecolor='gainsboro', alpha=0.7, boxstyle = "larrow", lw = 0.1))
+    axes[1].text(x = 535,y = 1.76, s = "13 fut. obs.", fontsize = 10, bbox=dict(facecolor='gainsboro', alpha=0.7, boxstyle = "larrow", lw = 0.1))
+    axes[1].legend(loc='upper center', bbox_to_anchor=(0.5, -0.17), ncol=3, frameon=False)
+
+    # WIS Score Plot
+    axes[2].plot(pnn_wis, label='NowcastPNN', marker='o', c = "crimson", markersize=5)
+    axes[2].plot(epi_wis, label='Epinowcast', marker='o', c = "dodgerblue", markersize=5)
+    axes[2].plot(rivm_wis, label='RIVM', marker='o', c = "black", markersize=5)
+    #axes[1].set_title('WIS Score Over Time')
+    axes[2].set_xlabel('Future observations (days)', fontsize="x-large")
+    axes[2].set_xticks(range(0, 14, 2))
+    axes[2].set_ylabel('WIS', fontsize="x-large")
+    #axes[2].legend()
+    axes[2].grid(alpha=.2)
+
+    plt.tight_layout()
+    if save:
+        plt.savefig("../outputs/figures/is_wis_future_obs.svg")
     plt.show()
 
 def days_to_date(start_date, num_days, past_units = 1):
@@ -422,4 +1009,4 @@ def days_to_date(start_date, num_days, past_units = 1):
     datetime: The corresponding date.
     """
     start_date = datetime.strptime(start_date, '%Y-%m-%d')
-    return start_date + timedelta(days=num_days+past_units-1)
+    return start_date + timedelta(days=int(num_days+past_units-1))
