@@ -29,8 +29,7 @@ To run this project locally, follow these steps:
 
 ## Usage
 
-model predictions has dictionaries with PIs for all models in [model_predictions](./date/model_predictions/)
-[src](./src/) contains all source code to run the models and analyses with notebooks available for detailed analysis corresponding to different sections of the paper. Most importantly, [NowcastPNN.py](./src/NowcastPNN.py) contains the code for the NowcastPNN models, both with and without embedding of weekdays.
+The folder [model_predictions](./data/model_predictions/) has dictionaries with prediction intervals (PIs) for all models in for both evaluation on most recent observations and randomly split test set. The directory [src](./src/) contains all source code to run the models and analyses with notebooks available for detailed analysis corresponding to different sections of the paper. Most importantly, [NowcastPNN.py](./src/NowcastPNN.py) contains the code for the NowcastPNN models, both with and without embedding of weekdays.
 The folder [weights](./src/weights/) contains the trained model weights for a variety of situations, including trained on randomly split versus sequentially split data, as well as weights for analysis investigating the number of training data points or past units needed. The suffix `-rec` here stands for trained on older data to be evaluated on the most recent observations and suffix `-dow` stands for a model using the embedding block for the weekday.
 Files [Epinowcast.R](./src/Epinowcast.R) and [RIVM.R](./src/RIVM.R) contain the code to form predictions from the benchmark models.
 The model can thus be used directly by loading the desired weights. If you want to retrain the models, e.g. with different hyperparameter settings, just follow the outline of the jupyter notebooks. All plots created will be saved to the outputs folder directly.
