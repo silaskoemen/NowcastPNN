@@ -51,5 +51,5 @@ Contributions are welcome. Please feel free to submit a pull request or open an 
 
 ## License
 
-This project is licensed under the [MIT](LICENSE) and [CC-BY-4.0](CC-BY-4.0) Licenses.
+This project is licensed under the [CC-BY-4.0](LICENSE) License.
       
