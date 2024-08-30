@@ -324,6 +324,50 @@ def plot_is_decomp_wis(epi_score_dict, rivm_score_dict, pnn_score_dict, save = F
         plt.savefig(f"../outputs/figures/is_decomp_wis{'_rec' if not random_split else ''}.svg")
     plt.show()
 
+def plot_coverages_rand_rec(epi_score_dict, epi_score_dict_rec, rivm_score_dict, rivm_score_dict_rec, pnn_score_dict, pnn_score_dict_rec, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save = False):
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.6))
+    colors_covs = ["dodgerblue", "black", "crimson"]
+    models = ["Epinowcast", "RIVM", "NowcastPNN"]
+    # Extract values for this day
+    for i, covs in enumerate([epi_score_dict["coverages"], rivm_score_dict["coverages"], pnn_score_dict["coverages"],]):
+        actual_coverages = [covs[level] for level in levels]
+        #colors = [cmap(i/14)]
+        axes[0].plot(levels, actual_coverages, marker='o', color=colors_covs[i], label=f'{models[i]}')
+
+        # Set title, labels, and x-ticks
+    axes[0].set_xlabel('Expected Coverage', fontsize="x-large")
+    axes[0].set_ylabel('Actual Coverage', fontsize="x-large")
+    axes[0].set_xticks(levels)
+    axes[0].set_yticks(levels)
+    axes[0].set_title("Random test set", fontsize="x-large")
+    axes[0].grid(True)
+    axes[0].tick_params(axis='x', labelrotation = 45)
+    axes[0].plot(levels, levels, linestyle = '--', color='black', linewidth = 3)  # 45° line
+
+    axes[0].legend(title='Model', bbox_to_anchor=(1.025, 1.), loc='upper left')
+
+    for i, covs in enumerate([epi_score_dict_rec["coverages"], rivm_score_dict_rec["coverages"], pnn_score_dict_rec["coverages"],]):
+        actual_coverages = [covs[level] for level in levels]
+        #colors = [cmap(i/14)]
+        axes[1].plot(levels, actual_coverages, marker='o', color=colors_covs[i], label=f'{models[i]}')
+
+        # Set title, labels, and x-ticks
+    axes[1].set_xlabel('Expected Coverage', fontsize="x-large")
+    #axes[1].set_ylabel('Actual Coverage', fontsize="x-large")
+    axes[1].set_xticks(levels)
+    axes[1].set_title("Recent test set", fontsize="x-large")
+    axes[1].set_yticks(levels)
+    axes[1].grid(True)
+    axes[1].tick_params(axis='x', labelrotation = 45)
+    axes[1].plot(levels, levels, linestyle = '--', color='black', linewidth = 3)  # 45° line
+
+    #axes[1].legend(title='Model', bbox_to_anchor=(1.025, 1.), loc='upper left')
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"../outputs/figures/coverages_rand_rec.svg")
+    plt.show()
+
 def plot_pica(epi_scores, rivm_scores, pnn_scores):
     """ Plot vertical bar charts to visualize the PI Coverage Accuracies scores achieved by all models. """
     scores  = [epi_scores, rivm_scores, pnn_scores]
@@ -427,37 +471,38 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
 
     ## Add first of month as ticks, add all reported on day, add prediction with past from model
 
-    df = df[(idx-horizon+1):(idx+future_units+1), :].copy()
+    df = df[(idx-horizon+1):(idx+future_units+2), :].copy()
     max_delay = df.shape[1]
-    y_otd = df[:, 0]
+    y_otd = df[:, 0].copy()
     y_true = df.sum(axis = 1)
 
-    mask = np.zeros((horizon+future_units, max_delay), dtype=bool)
+    mask = np.zeros((horizon+future_units+1, max_delay), dtype=bool)
     for p in range(max_delay):
         for d in range(max_delay):
             if p + d >= max_delay:
                 mask[p+(horizon-max_delay), d] = True
     df[mask] = 0.
-    df[(idx+1):-1, :] = 0.
+    df[(idx+1):, :] = 0.
+    df[-1, :] = 0.
 
     y_obs = df.sum(axis = 1)
 
-    dates = [days_to_date(start_date, days, past_units) for days in range(idx - horizon+1, idx+future_units+1)]
+    dates = [days_to_date(start_date, days, past_units) for days in range(idx - horizon+1, idx+future_units+2)]
     
     # Create a DataFrame
     date_df = pd.DataFrame({'Date': dates})
 
     plt.figure(figsize=(8, 4))
     plt.plot(date_df["Date"], y_true, label="True count", color = "black")
-    plt.plot(date_df["Date"], y_obs, label=f"Observed up to {date_df.iloc[-(future_units+1), 0].strftime('%Y-%m-%d')}", color = "crimson") # convert with start date to day and then plot with months
+    plt.plot(date_df["Date"][:-1], y_obs[:-1], label=f"Observed up to {date_df.iloc[-(future_units+2), 0].strftime('%Y-%m-%d')}", color = "crimson") # convert with start date to day and then plot with months
     plt.plot(date_df["Date"], y_otd, label= "Reported on day", c = "grey")
     """if weeks:
         plt.xlabel("EpiWeeks in the past")
     else:
         plt.xlabel("Days in the past")
     plt.xticks([*range(horizon)], [*range(horizon-1, -1, -1)])"""
-    plt.axvline(date_df.iloc[-(future_units+1)], color = "black", linestyle="--", label="Current day")
-    plt.ylabel("Number of cases")
+    plt.axvline(date_df.iloc[-(future_units+2)], color = "black", linestyle="--", label="Current day")
+    plt.ylabel("Number of cases", fontsize = "x-large")
     """date_df['MonthStart'] = date_df['Date'].apply(lambda x: x.replace(day=1))
     month_starts = date_df['MonthStart'].unique()
     
@@ -465,6 +510,7 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
     plt.xticks(rotation = 30)
     plt.legend()
     plt.xlim(date_df["Date"].iloc[0], date_df["Date"].iloc[-1])
+    plt.ylim(0)
     plt.grid(alpha=0.2)
     plt.savefig("../outputs/figures/nowcasting_task_true_on_day.svg")
     plt.show()
@@ -486,8 +532,8 @@ def plot_max_delay_day(df_unlimited_delay):
     axs[0].plot(cum_reported, label='Cumulative Reported Cases', color='grey')
     axs[0].axhline(0.99, color='red', linestyle='-.', label='99% threshold')
     axs[0].axvline(n_days_99, color='black', linestyle='--', label=f'Day {n_days_99}')
-    axs[0].set_xlabel('Days')
-    axs[0].set_ylabel('Cumulative Reported Cases')
+    axs[0].set_xlabel('Days', fontsize="x-large")
+    axs[0].set_ylabel('Cumulative Reported Cases (%)', fontsize="x-large")
     axs[0].legend()
     axs[0].set_ylim(0, 1.05)
     axs[0].set_xlim(-5,365)
@@ -496,8 +542,8 @@ def plot_max_delay_day(df_unlimited_delay):
     # Plot for fraction_reported
     axs[1].plot(fractions_reported, label='Fraction Reported', color='dodgerblue')
     axs[1].axvline(n_days_99, color='black', linestyle='--', label=f'Day {n_days_99}')
-    axs[1].set_xlabel('Days')
-    axs[1].set_ylabel('Fraction Reported')
+    axs[1].set_xlabel('Days', fontsize="x-large")
+    axs[1].set_ylabel('Fraction Reported (%)', fontsize="x-large")
     axs[1].legend()
     axs[1].set_xlim(-5,365)
     axs[1].grid(alpha=.2)
@@ -648,7 +694,8 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     ax1.grid(alpha=0.2)
     ax1.tick_params(axis='x', labelrotation = 25)
     ax1.axvline(cur_date, color="black", linestyle="--", label=f"Current {'day' if not weeks else 'week'}")
-    ax1.set_title("Epinowcast")
+    ax1.set_title("Epinowcast", fontsize = "x-large")
+    ax1.set_ylabel("Number of cases", fontsize="x-large")
 
     # Plot for NowcastPNN
     ax2.plot(date_df["Date"], y_vals, label="True count", c="black")
@@ -659,7 +706,7 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     ax2.grid(alpha=0.2)
     ax2.tick_params(axis='x', labelrotation = 25)
     ax2.axvline(cur_date, color="black", linestyle="--", label=f"Current {'day' if not weeks else 'week'}")
-    ax2.set_title("NowcastPNN")
+    ax2.set_title("NowcastPNN", fontsize = "x-large")
 
     # Plot for RIVM
     ax3.plot(date_df["Date"], y_vals, label="True count", c="black")
@@ -670,11 +717,11 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     ax3.grid(alpha=0.2)
     ax3.tick_params(axis='x', labelrotation = 25)
     ax3.axvline(cur_date, color="black", linestyle="--", label=f"Current {'day' if not weeks else 'week'}")
-    ax3.set_title("RIVM")
+    ax3.set_title("RIVM", fontsize = "x-large")
 
     # Set common labels
     #fig.text(0.5, 0.04, "Date", ha="center", fontsize=14)
-    fig.text(0., 0.5, "Number of cases", va="center", rotation="vertical", fontsize=14)
+    #fig.text(0., 0.5, "Number of cases", va="center", rotation="vertical", fontsize=14)
 
     # Add a legend only to the first subplot
     ax1.legend()
@@ -735,9 +782,9 @@ def compare_coverages_future_obs(pnn_coverages, epi_coverages, rivm_coverages, s
             ax.plot(levels, actual_coverages, marker='o', color=cmap(day_idx)[:3], label=f'Fut. obs.: {day_idx}')
         
         # Set title, labels, and x-ticks
-        ax.set_title(model_names[i])
-        ax.set_xlabel('Expected Coverage')
-        if i == 0: ax.set_ylabel('Actual Coverage')
+        ax.set_title(model_names[i], fontsize="x-large")
+        ax.set_xlabel('Expected Coverage', fontsize="x-large")
+        if i == 0: ax.set_ylabel('Actual Coverage', fontsize="x-large")
         ax.set_xticks(levels)
         ax.set_yticks(levels)
         ax.grid(True)
