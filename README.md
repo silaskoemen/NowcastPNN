@@ -43,7 +43,7 @@ The model can thus be used directly by loading the desired weights. If you want 
 
 ## Reproducibility
 
-Add paragraph from thesis
+Regarding the computational setup, special attention was given to ensure reproducibility, with seeds being used in every step of random sampling for all libraries used in the code. All code was run on macOS Sonoma 14.5 on a MacBook Air with M1 Chip and hardware acceleration activated via Apple Metal. Versions of all libraries used can be found in the [requirements.txt](requirements.txt) file. Because different operating systems and processing units (e.g. Windows/Mac or CPU/GPU) perform certain operations like matrix sums or multiplications in different orders, results might differ on other operating systems. Within each operating system and CPU/GPU choice, all results, including training runs and sampling from the final models, are reproducible and identical for every rerun. Moreover, weights of the trained models and final predictions (PIs, median, and minimum and maximum values) for both test sets are available in the folder [model_predictions](./data/model_predictions/).
 
 ## Contributing
 
