@@ -58,6 +58,7 @@ for (i in 1:length(test_dates)) {
 
 levels <- c(0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1)
 
+## At times MLE estimation diverged and the count cannot be estimated. The estimate is then replaced by the previous day's value and estimation is restarted from the day before.
 progress_counter = 1
 for(td in test_dates) {
   print(paste0("Date ",progress_counter,"/",length(test_dates), " (",td,")"))
