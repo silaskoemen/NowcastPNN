@@ -1,6 +1,6 @@
 # NowcastPNN
 
-This repository contains all code required for reproducing the results corresponding to the thesis paper titled "Attention-Based Probabilistic Neural Networks for Nowcasting of Dengue Fever in Brazil". The paper proposes a novel neural network (NN) structure, based on the popular attention mechanism and outputs a distribution over the target variable instead of a single point prediction (hence the name probabilistic). Valid uncertainty intervals are obtained from sampling from the generated distribution and the use of MC (Monte Carlo) Dropout. All data necessary is available upon request. Any contributions to this repository and the NowcastPNN model are welcome. Users can easily apply the model to their own data and recreate the plots seen here. Although all hyperparameters of the models can be tuned, the models can be safely employed out of the box and pre-configured models and notebooks are available for straightforward usage and demonstration. 
+This repository contains all code required for reproducing the results corresponding to the thesis paper titled "Attention-Based Probabilistic Neural Networks for Nowcasting of Dengue Fever in Brazil". The paper proposes a novel neural network (NN) structure, based on the popular attention mechanism and outputs a distribution over the target variable instead of a single point prediction (hence the name probabilistic). Valid uncertainty intervals are obtained from sampling from the generated distribution and the use of Monte Carlo (MC) Dropout. All data necessary is available upon request. Any contributions to this repository and the NowcastPNN model are welcome. Users can easily apply the model to their own data and recreate the plots seen here. Although all hyperparameters of the models can be tuned, the models can be safely employed out of the box and pre-configured models and notebooks are available for straightforward usage and demonstration. A diagram showing the structure is [Architecture_slide.pdf](./outputs/figures/Architecture_slide.pdf).
 
 The plot below illustrates the strenghts of the NowcastPNN. For same day nowcasts on unseen data, the estimates from the NowcastPNN are much closer to the true values, while having narrower (more precise) confidence intervals.
 <img src="./outputs/figures/comparison_sameday_nowcast_2018-12-23_2019-07-11.svg">
@@ -43,7 +43,7 @@ The model can thus be used directly by loading the desired weights. If you want 
 
 ## Reproducibility
 
-Add paragraph from thesis
+Regarding the computational setup, special attention was given to ensure reproducibility, with seeds being used in every step of random sampling for all libraries used in the code. All code was run on macOS Sonoma 14.5 on a MacBook Air with M1 Chip and hardware acceleration activated via Apple Metal. Versions of all libraries used can be found in the [requirements.txt](requirements.txt) file. Because different operating systems and processing units (e.g. Windows/Mac or CPU/GPU) perform certain operations like matrix sums or multiplications in different orders, results might differ on other operating systems. Within each operating system and CPU/GPU choice, all results, including training runs and sampling from the final models, are reproducible and identical for every rerun. Moreover, weights of the trained models and final predictions (PIs, median, and minimum and maximum values) for both test sets are available in the folder [model_predictions](./data/model_predictions/).
 
 ## Contributing
 
@@ -51,5 +51,5 @@ Contributions are welcome. Please feel free to submit a pull request or open an 
 
 ## License
 
-This project is licensed under the [MIT](LICENSE) and [CC-BY-4.0](CC-BY-4.0) Licenses.
+This project is licensed under the [CC-BY-4.0](LICENSE) License.
       
