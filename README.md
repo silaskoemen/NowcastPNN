@@ -20,7 +20,7 @@ To compare the benchmark models (Epinowcast and RIVM) to the NowcastPNN the Inte
 
 ## Data
 
-The dataset used in this project is sourced from the Brazilian Ministry of Health (Ministério da saúde) and its associated DATASUS service. For this analysis, data on Dengue incidences in São Paulo from years 2013 to 2020 were used.
+The dataset used in this project is sourced from the Brazilian Ministry of Health (Ministério da saúde) and its associated DATASUS service. For this analysis, data on Dengue incidences in São Paulo from years 2013 to 2020 was used.
 
 ## Outputs
 
