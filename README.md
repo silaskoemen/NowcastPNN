@@ -5,7 +5,7 @@ This repository contains all code required for reproducing the results correspon
 The plot below illustrates the strenghts of the NowcastPNN. For same day nowcasts on unseen data, the estimates from the NowcastPNN are much closer to the true values, while having narrower (more precise) confidence intervals.
 <img src="./outputs/figures/comparison_sameday_nowcast_2018-12-23_2019-07-11.svg">
 
-To compare the benchmark models (Epinowcast and RIVM) to the NowcastPNN the Interval Score (IS) and Weighted IS (WIS) can be used, as seen below, where the NowcastPNN has significantl lower values and less spread than the other models.
+To compare the benchmark models (Epinowcast and RIVM) to the NowcastPNN the Interval Score (IS) and Weighted IS (WIS) can be used, as seen below, where the NowcastPNN has significantly lower values and less spread than the other models.
 <img src="./outputs/figures/is_decomp_wis_rec.svg">
 
 ## Table of Contents
