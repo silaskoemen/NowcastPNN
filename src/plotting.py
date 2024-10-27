@@ -626,10 +626,11 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
         plt.savefig(f"../outputs/figures/past_correction_{'week' if weeks else 'day'}_{idx_current}_fut{future_obs}")
     plt.show()
 
-def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, dataset, rivm_dict, epi_dict, save = False, random_split = True, padding = "both", dow = False, padding_val = 0, n_samples = 200, levels = [0.5, 0.95], idx = 787):
+def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, dataset, rivm_dict, epi_dict, save = False, random_split = True, padding = "both", dow = False, padding_val = 0, n_samples = 200, levels = [0.5, 0.95], idx = 787, number_obs = False):
     model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std.
     model.drop1.train() # keeps dropout layers active
     model.drop2.train()
+    if number_obs: assert isinstance(dataset, list), "If the number of observations is given, the entire dataset collection needs to be parsed"
     if padding is None or padding == "none": left, right = False, False
     elif padding == "both": left, right = True, True
     elif padding == "left": left, right = True, False
@@ -639,7 +640,14 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
 
     model = model.to("cpu")
     idx_current = idx
-    mat, y = dataset[idx_current]
+    if number_obs:
+        mat, y = dataset[0][idx_current]
+    else:
+        mat, y = dataset[idx_current]
+    if number_obs:
+        y, num_obs = y
+        num_obs = num_obs.to("cpu").numpy()
+        num_obs_vals = []
     if dow:
         mat, dow_val = mat
         dow_val = dow_val.to("cpu")
@@ -648,10 +656,16 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     y_vals = []
 
     #x_vals = [*range(idx_current-future_obs+1, idx_current+1)]
-    for p in range(idx_current-future_obs, idx_current): # know last one from above, would add padding outside of them
-        y_vals.append(dataset[p][1].cpu().numpy())
+    if number_obs:
+        for p in range(-future_obs, 0): # know last one from above, would add padding outside of them
+            y_vals.append(dataset[np.abs(p)][idx_current][1][0].cpu().numpy())
+            num_obs_vals.append(dataset[np.abs(p)][idx_current][1][1].cpu().numpy())
+        num_obs_vals.append(num_obs)
+    else:
+        for p in range(idx_current-future_obs, idx_current): # know last one from above, would add padding outside of them
+            y_vals.append(dataset[p][1].cpu().numpy())
     y_vals.append(y)
-
+        
     x_min, x_max = idx_current-future_obs, idx_current
     if left:
         x_min -= padding_val
@@ -668,11 +682,17 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     
     for f in range(future_obs+1):
         model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}{'-rec' if not random_split else ''}{'-dow' if dow else ''}"))
+        if random_split:
+            model.drop1.p, model.drop2.p = 0.3 * (1-f/future_obs), 0.1 * (1-f/future_obs)
+        else:
+            model.drop1.p, model.drop2.p = 0.15 * (1-f/future_obs), 0.05 * (1-f/future_obs) # 1st +0.05, 2nd +0.1
         for i in range(n_samples):
             if dow:
                 preds[f, i] = model(mat, dow_val).sample().numpy()
             else:
                 preds[f, i] = model(mat).sample().numpy()
+        # Have lower bound in num_obs_vals, set all samples below that to LB
+        preds[f, :][preds[f, :] < num_obs_vals[-(f+1)]] = num_obs_vals[-(f+1)]
     preds = preds[::-1, :]
     preds_median = np.quantile(preds, 0.5, axis=1)
     
@@ -699,6 +719,7 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
 
     # Plot for NowcastPNN
     ax2.plot(date_df["Date"], y_vals, label="True count", c="black")
+    ax2.plot(date_df["Date"], num_obs_vals, label="Already observed count", c="grey")
     ax2.plot(date_df["Date"].iloc[(padding_val):padding_val+future_obs+2], preds_median, label="Median nowcasted predictions", c="crimson", alpha=0.75)
     for l in levels:
         lower, upper = intervals_dict[l]
@@ -719,10 +740,6 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     ax3.axvline(cur_date, color="black", linestyle="--", label=f"Current {'day' if not weeks else 'week'}")
     ax3.set_title("RIVM", fontsize = "x-large")
 
-    # Set common labels
-    #fig.text(0.5, 0.04, "Date", ha="center", fontsize=14)
-    #fig.text(0., 0.5, "Number of cases", va="center", rotation="vertical", fontsize=14)
-
     # Add a legend only to the first subplot
     ax1.legend()
 
@@ -731,21 +748,6 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     if save:
         plt.savefig(f"../outputs/figures/comparison_past_correction_{idx}.svg")
     plt.show()
-"""
-    plt.figure(figsize=(12, 7))
-    plt.plot(date_df["Date"], y_vals, label="True count", c = "black") # [*range(x_min, x_max+1)]
-    plt.plot(date_df["Date"].iloc[(padding_val):(padding_val+future_obs)], preds_mean, label = "Median nowcasted predictions", c = "crimson", alpha = 0.75) # [*range(idx_current-future_obs+1, idx_current+1)]
-    for l in levels:
-        lower, upper = intervals_dict[l]
-        plt.fill_between(date_df["Date"].iloc[(padding_val):(padding_val+future_obs)], lower, upper, color = "crimson", alpha = 0.2, label = f"{int(100*l)}% CI")
-    plt.grid(alpha=.2)
-    plt.axvline(cur_date, color = "black", linestyle = "--", label = f"Current {'day' if not weeks else 'week'}")
-    plt.xlabel("Days")
-    plt.legend()
-    plt.ylabel("Number of cases")
-    if save:
-        plt.savefig(f"../outputs/figures/past_correction_{'week' if weeks else 'day'}_{idx_current}_fut{future_obs}")
-    plt.show()"""
 
 def compare_coverages(pnn_dict, epi_dict, rivm_dict):
     """ If just single test run, make all in one plot against 45° line.

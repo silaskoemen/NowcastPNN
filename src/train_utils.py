@@ -37,9 +37,6 @@ class SubsetSampler(Sampler):
 
 def nll(y_true, y_pred):
     nll_loss = -y_pred.log_prob(y_true)
-    #print(nll_loss)
-    #nll_loss = torch.nan_to_num(nll_loss, posinf=1e6)
-    #print(nll_loss)
     return nll_loss
 
 def hybrid_loss(y_true, y_pred):
@@ -66,7 +63,17 @@ def get_loss(y_true, y_pred, loss_fct):
             return mse(y_true, y_pred)
     raise ValueError(f"Loss function {loss_fct} not supported. Choose one of hybrid, nll, mse or mae.")
 
-def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct = "nll", device = torch.device("mps"), dow = False):
+def process_preds_observed(dist_pred, num_obs):
+    """ Function to include information about the number of cases already observed.
+    Any predicted values below this lower bound will be set to the lower bound
+    
+    Args:
+        dist_pred[torch.tensor]: tensor of dimension (batch)
+    """
+
+
+
+def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct = "nll", device = torch.device("mps"), dow = False, num_obs = False):
     model.to(device)
     model.float()
     optimizer = torch.optim.Adam(model.parameters(), lr = 0.0003, weight_decay=1e-3)
@@ -76,6 +83,8 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         model.train()
         for mat, y in train_loader:
             optimizer.zero_grad()
+            if num_obs:
+                y, _ = y
             if dow:
                 mat, dow_val = mat.copy()
                 dist_pred = model(mat, dow_val)
@@ -105,8 +114,12 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         batch_loss /= len(train_loader)
         with torch.no_grad(): # performance on test/validation set
             model.eval()
+            #model.drop1.train()
+            #model.drop2.train()
             test_batch_loss = 0.
             for mat, y in val_loader:
+                if num_obs:
+                    y, _ = y
                 if dow:
                     mat, dow_val = mat
                     test_pred = model(mat.to(device), dow_val.to(device))

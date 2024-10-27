@@ -33,7 +33,7 @@ from torch.utils.data import Dataset
 class ReportingDataset(Dataset):
     ## Theoretically, should contain covariates for date too, return tuple of matrix and covariates as well as label at each iteration
 
-    def __init__(self, df, max_val, triangle = True, past_units=40, max_delay=40, future_obs = 0, device = "mps", vector_y = False, dow = False):
+    def __init__(self, df, max_val, triangle = True, past_units=40, max_delay=40, future_obs = 0, device = "mps", vector_y = False, dow = False, return_number_obs = False):
         """
         Initialize the dataset with a start and end date.
         The dataset will generate matrices for each date within this range.
@@ -57,6 +57,7 @@ class ReportingDataset(Dataset):
         self.vector_y = vector_y
         self.dow = dow
         self.start_date = "2013-01-01"
+        self.return_number_obs = return_number_obs
 
     def get_length(self):
         return self.df.shape[0]
@@ -86,12 +87,15 @@ class ReportingDataset(Dataset):
         
         # Compute the sum of the delays for the current date (row sum)
         label = torch.tensor([label]).to(self.device)
+        if self.return_number_obs:
+            num_obs = tensor.sum(axis = 1)[-(1+self.future_obs)].clone() # probably wrong
+            label = (label, num_obs)
         if self.dow:
             return (tensor/self.max_val, dow_val), label 
         return tensor/self.max_val, label
         #return tensor, label
 
-def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40, state = "SP", future_obs = 0, return_df = False, return_mat = False, vector_y = False, dow = False, path = "../data/derived/DENGSP.csv"):
+def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40, state = "SP", future_obs = 0, return_df = False, return_mat = False, return_number_obs = False, vector_y = False, dow = False, path = "../data/derived/DENGSP.csv", reference_col = None, report_col = None):
     """ Have to return the iterable dataset, so first read in csv file, then convert to delay-format
     Then feed to iterable dataset and return that
     
@@ -100,6 +104,7 @@ def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40,
     Returns:
     """
     assert not (return_df and return_mat), "Only either dataframe or matrix can be returned"
+    ## Add reference_col and report_col so use reference_date and report_date if None and given strings otherwise
     dengdf = pd.read_csv(path, index_col=0)#pd.read_csv(f"../data/derived/DENG{state}.csv", index_col=0)
     date_format = "%Y-%m-%d"
     dengdf['DT_NOTIFIC'] = pd.to_datetime(dengdf['DT_NOTIFIC'], format=date_format)
@@ -163,7 +168,7 @@ def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40,
     dengdf = np.array(dengdf.values, dtype = np.float32)
     
     ## Define dataset
-    return ReportingDataset(dengdf, max_val=max_val, triangle=triangle, past_units=past_units, max_delay=max_delay, future_obs=future_obs, vector_y = vector_y, dow = dow)
+    return ReportingDataset(dengdf, max_val=max_val, triangle=triangle, past_units=past_units, max_delay=max_delay, future_obs=future_obs, vector_y = vector_y, dow = dow, return_number_obs = return_number_obs)
     
 
 

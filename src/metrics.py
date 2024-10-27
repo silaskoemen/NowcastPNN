@@ -250,14 +250,16 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     IS(levels, intervals_dict, y)
     IS_decomposed(levels, intervals_dict, y)
 
-def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save = False, random_split=False, dow = False, biggest_outbreak = False):
+def pnn_PIs(model, test_loader, n_samples: int = 200, levels: list = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save: bool = False, random_split: bool = False, dow: bool = False, biggest_outbreak: bool = False, number_obs: bool = False):
     mat, y = next(iter(test_loader))
+    if number_obs:
+        y, num_obs = y
+        num_obs = num_obs.to("cpu").numpy()
     if dow:
         mat, dow_val = mat
-        mat, dow_val, y = mat.to("cpu"), dow_val.to("cpu"), y.to("cpu").numpy()
-    else:
-        mat, y = mat.to("cpu"), y.to("cpu").numpy()
-    model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std.
+        dow_val = dow_val.to("cpu")
+    mat, y = mat.to("cpu"), y.to("cpu").numpy()
+    model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std and overall means and stds used
     model.drop1.train() # keeps dropout layers active
     model.drop2.train()
     model = model.to("cpu")
@@ -265,6 +267,9 @@ def pnn_PIs(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5,
     for i in range(n_samples):
         #preds[:, i] = np.squeeze(model(mat).sample().numpy())
         preds[:, i] = model(mat).sample().numpy() if not dow else model(mat, dow_val).sample().numpy()
+        ## Set all predictions below lower bound equal to lower bound if given
+        if number_obs:
+            preds[:, i][preds[:, i] < num_obs] = num_obs[preds[:, i] < num_obs]
     min_preds, max_preds = np.min(preds, axis=1), np.max(preds, axis=1)
     pred_median = np.quantile(preds, 0.5, axis=1)
     #print(pred_median)
@@ -321,8 +326,10 @@ def pnn_PIs_indiv(model, test_loader, n_samples = 200, levels = [0.05, 0.1, 0.25
 
     return intervals_dict
 
-def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], return_y = False, return_coverages = True, return_is_decomposed = True, total = True):
+def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], return_y = False, return_coverages = True, return_is_decomposed = True, total = True, number_obs = False):
     _, y = next(iter(test_loader))
+    if number_obs:
+        y, _ = y
     y = y.to("cpu").numpy()
     if not total:
         y = y.sum(axis = 1)
