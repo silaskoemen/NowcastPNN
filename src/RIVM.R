@@ -28,6 +28,7 @@ source('src/rivm_utils/RIVM_functions.R')
 ## Load data
 full_df = read.csv("data/derived/DENGSP.csv")
 
+PAST_UNITS <- 80
 # Remove invalid observations
 full_df$DT_SIN_PRI <- as.Date(full_df$DT_SIN_PRI)
 full_df$DT_NOTIFIC <- as.Date(full_df$DT_NOTIFIC)
@@ -48,7 +49,7 @@ sum(f.priordelay)
 #############################################
 ############# RANDOM TEST DAYS ##############
 #############################################
-test_dates = t(read.csv("src/test_dates.csv", header=F))
+test_dates = t(read.csv("src/test_dates_80_recent.csv", header=F)) # simply fill in which test set
 rownames(test_dates) <- 1:(length(test_dates))
 
 agg_list = list()
@@ -65,10 +66,10 @@ for(td in test_dates) {
   ## Initialize relevant data
   rep.data <- dataSetup(
     data         = df,
-    start.date   = as.Date(td)-50, # Starting date of outbreak - 2013-01-01+(39-1)
-    end.date     = as.Date(td)+50, # Ending date of outbreak (in real-time, leave NULL so end.date = nowcast.date)
+    start.date   = as.Date(td)-PAST_UNITS-10, # Starting date of outbreak - 2013-01-01+(39-1)
+    end.date     = as.Date(td)+PAST_UNITS+10, # Ending date of outbreak (in real-time, leave NULL so end.date = nowcast.date)
     nowcast.date = as.Date(td),    # Nowcast date
-    days.back    = 39,                    # Number of days back from nowcast.date to include in estimation procedure
+    days.back    = PAST_UNITS-1,                    # Number of days back from nowcast.date to include in estimation procedure
     f.priordelay = f.priordelay)          # Prior reporting delay PMF
   
   model.setup <- modelSetup(
