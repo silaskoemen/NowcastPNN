@@ -70,8 +70,8 @@ library(purrr)
 #############################################
 ######### RANDOM TEST OBSERVATIONS ##########
 #############################################
-
-test_dates = t(read.csv("src/test_dates.csv", header=F))
+PAST_UNITS <- 80
+test_dates = t(read.csv("src/test_dates_recent.csv", header=F))
 rownames(test_dates) <- 1:(length(test_dates))
 
 agg_list_epinc = list()
@@ -84,7 +84,8 @@ lower_columns <- (1 - levels) / 2
 upper_columns <- (1 + levels) / 2
 ## At times estimation diverged and the count cannot be estimated. The estimate is then replaced by the previous day's value and estimation is restarted from the day before.
 progress_counter = 1
-for(td in test_dates) {
+# agg_list_epinc[[test_dates[progress_counter]]] <- agg_list_epinc[[test_dates[progress_counter-1]]]; progress_counter = progress_counter+1
+for(td in test_dates[progress_counter:length(test_dates)]) {
   print(paste0("Date ",progress_counter,"/",length(test_dates), " (",td,")"))
   
   target_date = as.Date(td)
@@ -92,19 +93,18 @@ for(td in test_dates) {
   data_tab = cum_dt |> enw_filter_report_dates(latest_date = target_date+40)# |> enw_filter_reference_dates(latest_date = target_date, include_days = 30) # first enw_filter_reference_dates(earliest_date = target_date - 30, latest_date = target_date)
   data_tab = enw_complete_dates(data_tab, max_delay = 40)
   #data_tab = data_tab[!is.na(reference_date) & !is.na(report_date)]
-  # CUMULATIVE???, then would explain a lot, yes - cumulative - lorl
   
-  retro_tab  <- data_tab |>
+  retro_tab <- data_tab |>
     enw_filter_report_dates(remove_days = 40) |>
-    enw_filter_reference_dates(include_days = 40) # hat as available on day correctly
+    enw_filter_reference_dates(include_days = PAST_UNITS) # hat as available on day correctly
   
   # Soll wahrscheinlich available looking back plotten,
   # Ergo pro reference date group by und count?
   latest_tab <- data_tab |>
     enw_latest_data() |>
-    enw_filter_reference_dates(remove_days = 40, include_days = 40)
+    enw_filter_reference_dates(remove_days = 40, include_days = PAST_UNITS)
   
-  on_day_tab = data_tab[(reference_date > target_date - 40) & (reference_date <= target_date)]
+  on_day_tab = data_tab[(reference_date > target_date - PAST_UNITS) & (reference_date <= target_date)]
   on_day_tab = on_day_tab[, sum(confirm), by = reference_date]
   setnames(on_day_tab, "V1", "confirm")
   
@@ -163,7 +163,7 @@ library(jsonlite)
 
 # Convert the named list to JSON and save to a file
 json_epinc <- toJSON(agg_list_epinc, pretty = TRUE)
-write(json_epinc, file = "data/model_predictions/epinowcast_list.json")
+write(json_epinc, file = "data/model_predictions/epinowcast_list_rec_80.json")
 
 
 

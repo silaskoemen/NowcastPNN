@@ -330,6 +330,8 @@ def evaluate_PIs(intervals_dict, test_loader, levels = [0.05, 0.1, 0.25, 0.5, 0.
     _, y = next(iter(test_loader))
     if number_obs:
         y, _ = y
+    if isinstance(y, list):
+        y = y[0]
     y = y.to("cpu").numpy()
     if not total:
         y = y.sum(axis = 1)

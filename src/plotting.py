@@ -223,7 +223,7 @@ def plot_wis(epi_scores, rivm_scores, pnn_scores):
     plt.savefig(f"../outputs/figures/wis")
     plt.show()
 
-def plot_coverages_pica(epi_dict, rivm_dict, pnn_dict, levels = [0.5, 0.95], save = False, random_split = True):
+def plot_coverages_pica(epi_dict, rivm_dict, pnn_dict, levels = [0.5, 0.95], save = False, random_split = True, suffix = ""):
     colors_50 = ['dodgerblue', 'black', 'crimson']
     colors_95 = ['dodgerblue', 'black', 'crimson']
 
@@ -279,10 +279,10 @@ def plot_coverages_pica(epi_dict, rivm_dict, pnn_dict, levels = [0.5, 0.95], sav
     ax2.grid(True, axis='y', alpha=0.2, zorder=1)
     plt.tight_layout()
     if save:
-        plt.savefig(f"../outputs/figures/coverages_pica{'_rec' if not random_split else ''}.svg")
+        plt.savefig(f"../outputs/figures/coverages_pica{'_rec' if not random_split else ''}{suffix}.svg")
     plt.show()
 
-def plot_is_decomp_wis(epi_score_dict, rivm_score_dict, pnn_score_dict, save = False, random_split = True):
+def plot_is_decomp_wis(epi_score_dict, rivm_score_dict, pnn_score_dict, save = False, random_split = True, suffix = ""):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (10, 3.5))
     y_pos = np.arange(len(models))
     bar_width = 0.35
@@ -321,7 +321,7 @@ def plot_is_decomp_wis(epi_score_dict, rivm_score_dict, pnn_score_dict, save = F
     ax2.grid(True, axis='y', alpha=0.2, zorder=1)
     plt.tight_layout()
     if save:
-        plt.savefig(f"../outputs/figures/is_decomp_wis{'_rec' if not random_split else ''}.svg")
+        plt.savefig(f"../outputs/figures/is_decomp_wis{'_rec' if not random_split else ''}{suffix}.svg")
     plt.show()
 
 def plot_coverages_rand_rec(epi_score_dict, epi_score_dict_rec, rivm_score_dict, rivm_score_dict_rec, pnn_score_dict, pnn_score_dict_rec, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95], save = False):
@@ -390,7 +390,7 @@ def plot_pica(epi_scores, rivm_scores, pnn_scores):
     plt.show()
 
 
-def plot_sameday_nowcast_recent(test_loader, test_idcs, levels_pnn, levels_epi, levels_rivm, save = False, xlims = None):
+def plot_sameday_nowcast_recent(test_loader, test_idcs, levels_pnn, levels_epi, levels_rivm, save = False, xlims = None, suffix = ""):
     fig, axs = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
     if xlims is not None:
         xlims = [datetime.strptime(xlims[0], "%Y-%m-%d"), datetime.strptime(xlims[1], "%Y-%m-%d")]
@@ -451,9 +451,9 @@ def plot_sameday_nowcast_recent(test_loader, test_idcs, levels_pnn, levels_epi, 
     plt.tight_layout()
     if save:
         if xlims is not None:
-            plt.savefig(f"../outputs/figures/comparison_sameday_nowcast_{xlims[0].strftime('%Y-%m-%d')}_{xlims[1].strftime('%Y-%m-%d')}.svg")
+            plt.savefig(f"../outputs/figures/comparison_sameday_nowcast_{xlims[0].strftime('%Y-%m-%d')}_{xlims[1].strftime('%Y-%m-%d')}{suffix}.svg")
         else:
-            plt.savefig("../outputs/figures/comparison_sameday_nowcast.svg")
+            plt.savefig(f"../outputs/figures/comparison_sameday_nowcast{suffix}.svg")
     plt.show()
 
 
@@ -532,8 +532,8 @@ def plot_max_delay_day(df_unlimited_delay):
     axs[0].plot(cum_reported, label='Cumulative Reported Cases', color='grey')
     axs[0].axhline(0.99, color='red', linestyle='-.', label='99% threshold')
     axs[0].axvline(n_days_99, color='black', linestyle='--', label=f'Day {n_days_99}')
-    axs[0].set_xlabel('Days', fontsize="x-large")
-    axs[0].set_ylabel('Cumulative Reported Cases (%)', fontsize="x-large")
+    axs[0].set_xlabel('Days', fontsize="large")
+    axs[0].set_ylabel('Cumulative proportion of reported cases (%)', fontsize="large")
     axs[0].legend()
     axs[0].set_ylim(0, 1.05)
     axs[0].set_xlim(-5,365)
@@ -542,8 +542,8 @@ def plot_max_delay_day(df_unlimited_delay):
     # Plot for fraction_reported
     axs[1].plot(fractions_reported, label='Fraction Reported', color='dodgerblue')
     axs[1].axvline(n_days_99, color='black', linestyle='--', label=f'Day {n_days_99}')
-    axs[1].set_xlabel('Days', fontsize="x-large")
-    axs[1].set_ylabel('Fraction Reported (%)', fontsize="x-large")
+    axs[1].set_xlabel('Days', fontsize="large")
+    axs[1].set_ylabel('Proportion of reported cases (%)', fontsize="large")
     axs[1].legend()
     axs[1].set_xlim(-5,365)
     axs[1].grid(alpha=.2)
@@ -1027,7 +1027,7 @@ def plot_is_wis_future_obs(pnn_is_decomp, epi_is_decomp, rivm_is_decomp, pnn_wis
     axes[1].set_xlabel('IS Decomposition', fontsize="x-large")
     axes[1].grid(True, alpha=0.4, zorder=1)
     axes[1].text(x = 790,y = 2.127, s = "same-day", fontsize = 10, bbox=dict(facecolor='gainsboro', alpha=0.7, boxstyle = "larrow", lw = 0.1))
-    axes[1].text(x = 535,y = 1.76, s = "13 fut. obs.", fontsize = 10, bbox=dict(facecolor='gainsboro', alpha=0.7, boxstyle = "larrow", lw = 0.1))
+    axes[1].text(x = 390,y = 1.76, s = "13 fut. obs.", fontsize = 10, bbox=dict(facecolor='gainsboro', alpha=0.7, boxstyle = "larrow", lw = 0.1))
     axes[1].legend(loc='upper center', bbox_to_anchor=(0.5, -0.17), ncol=3, frameon=False)
 
     # WIS Score Plot
