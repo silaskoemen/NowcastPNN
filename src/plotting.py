@@ -567,7 +567,7 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
         idx_current = idx
     else:
         raise AssertionError("Provide just one of idx or test_idcs, not both")
-    mat, y = dataset[idx_current]
+    mat, (y, _) = dataset[idx_current]
     if dow:
         mat, dow_val = mat
         dow_val = dow_val.to("cpu")
@@ -577,9 +577,8 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
 
     #x_vals = [*range(idx_current-future_obs+1, idx_current+1)]
     for p in range(idx_current-future_obs, idx_current): # know last one from above, would add padding outside of them
-        y_vals.append(dataset[p][1].cpu().numpy())
+        y_vals.append(dataset[p][1][0].cpu().numpy())
     y_vals.append(y)
-
     x_min, x_max = idx_current-future_obs, idx_current
     if left:
         x_min = idx_current - future_obs + 1 - padding_val
@@ -600,6 +599,7 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
     
     for f in range(future_obs+1):
         model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}{'-rec' if not random_split else ''}{'-dow' if dow else ''}"))
+        model.drop1.p, model.drop2.p = 0.1 * (1-f/future_obs) + 0.1, 0.15 * (1-f/future_obs)
         for i in range(n_samples):
             if dow:
                 preds[f, i] = model(mat, dow_val).sample().numpy()
@@ -682,10 +682,12 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     
     for f in range(future_obs+1):
         model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}{'-rec' if not random_split else ''}{'-dow' if dow else ''}"))
+        
         if random_split:
             model.drop1.p, model.drop2.p = 0.3 * (1-f/future_obs), 0.1 * (1-f/future_obs)
         else:
             model.drop1.p, model.drop2.p = 0.15 * (1-f/future_obs), 0.05 * (1-f/future_obs) # 1st +0.05, 2nd +0.1
+        model.drop1.p, model.drop2.p = 0.1 * (1-f/future_obs) + 0.1, 0.15 * (1-f/future_obs)
         for i in range(n_samples):
             if dow:
                 preds[f, i] = model(mat, dow_val).sample().numpy()
@@ -719,7 +721,7 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
 
     # Plot for NowcastPNN
     ax2.plot(date_df["Date"], y_vals, label="True count", c="black")
-    ax2.plot(date_df["Date"], num_obs_vals, label="Already observed count", c="grey")
+    # ax2.plot(date_df["Date"], num_obs_vals, label="Already observed count", c="grey")
     ax2.plot(date_df["Date"].iloc[(padding_val):padding_val+future_obs+2], preds_median, label="Median nowcasted predictions", c="crimson", alpha=0.75)
     for l in levels:
         lower, upper = intervals_dict[l]
