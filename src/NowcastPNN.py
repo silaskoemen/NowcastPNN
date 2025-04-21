@@ -4,7 +4,7 @@ from NegativeBinomial import NegBin as NB
 
 ## For matrix-like (two-dimensional) input data
 class NowcastPNN(nn.Module):
-    def __init__(self, past_units = 30, max_delay = 40, hidden_units = [16, 8], conv_channels = [10, 1, 1]):
+    def __init__(self, past_units = 30, max_delay = 40, hidden_units = [16, 8], conv_channels = [16, 1], dropout_probs = [0.15, 0.1]):
         super().__init__()
         self.past_units = past_units
         self.max_delay = max_delay
@@ -25,7 +25,7 @@ class NowcastPNN(nn.Module):
         #self.bnorm7 = nn.BatchNorm1d(num_features=hidden_units[1])
         self.bnorm_final = nn.BatchNorm1d(num_features=hidden_units[-1]) #hidden_units[1]/self.past_units for single model
         self.attn1 = nn.MultiheadAttention(embed_dim=self.max_delay, num_heads=1, batch_first=True)
-        self.drop1, self.drop2 = nn.Dropout(0.1), nn.Dropout(0.1)#, nn.Dropout(0.1) # 0.4, 0.4, 0.2 great performance, but too wide CIs
+        self.drop1, self.drop2 = nn.Dropout(dropout_probs[0]), nn.Dropout(dropout_probs[1]) 
         self.softplus = nn.Softplus()
         self.act = nn.SiLU()
     
@@ -156,6 +156,7 @@ class NowcastPNNDOW(nn.Module):
         ## Attention Block ##
         x_add = x.clone()
         x = self.attn1(x, x, x, need_weights = False)[0]
+        # Think about processing delay_dim, meaning indep for each time step, permute after
         x = self.act(self.fc1(x.permute(0,2,1)))
         x = x.permute(0,2,1) + x_add
 
@@ -182,3 +183,18 @@ class NowcastPNNDOW(nn.Module):
         x = self.fcnb(self.bnorm_final(x))
         dist = NB(lbda = self.const*self.softplus(x[:, 0]), phi = (self.const**2)*self.softplus(x[:, 1])+1e-5)
         return torch.distributions.Independent(dist, reinterpreted_batch_ndims=1)
+    
+
+""" from prettytable import PrettyTable
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad: continue
+        params = parameter.numel()
+        table.add_row([name, params])
+        total_params+=params
+    print(table)
+    print(f"Total Trainable Params: {total_params}")
+    return total_params
+count_parameters(npnn) """
