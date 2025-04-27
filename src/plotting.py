@@ -515,6 +515,7 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
     plt.savefig("../outputs/figures/nowcasting_task_true_on_day.svg")
     plt.show()
 
+
 def plot_max_delay_day(df_unlimited_delay):
     unlim_delay_array = np.array(df_unlimited_delay)
     ## Could plot pdf and ecdf for both, next to each other to show
@@ -550,6 +551,93 @@ def plot_max_delay_day(df_unlimited_delay):
     plt.tight_layout()
     plt.savefig("../outputs/figures/day_max_delay.svg")
     plt.show()
+
+
+def plot_nowcast_objective_delay_distribution(df_counts: pd.DataFrame, df_delays: pd.DataFrame, idx: int = 800, future_units = 0, horizon: int = 30, past_units: int = 40, start_date: str = "2013-01-01", fig_size: tuple[int, int] = (12, 8), save: bool = False) -> None:
+    # Create a figure with a 2x2 grid
+    fig = plt.figure(figsize=fig_size)
+    
+    # Create a special grid layout
+    gs = plt.GridSpec(2, 2, figure=fig)
+    
+    # Create the top subplot that spans both columns
+    ax_top = fig.add_subplot(gs[0, :])
+    
+    # Create the two bottom subplots
+    ax_bottom_left = fig.add_subplot(gs[1, 0])
+    ax_bottom_right = fig.add_subplot(gs[1, 1])
+    
+    # --- Plot the distance_true_observed in the top subplot ---
+    if isinstance(df_counts, pd.DataFrame): 
+        df_array = np.array(df_counts.values, dtype=np.float32)
+    else:
+        df_array = df_counts.copy()
+
+    df_plot = df_array[(idx-horizon+1):(idx+future_units+2), :].copy()
+    max_delay = df_plot.shape[1]
+    y_otd = df_plot[:, 0].copy()
+    y_true = df_plot.sum(axis=1)
+
+    mask = np.zeros((horizon+future_units+1, max_delay), dtype=bool)
+    for p in range(max_delay):
+        for d in range(max_delay):
+            if p + d >= max_delay:
+                mask[p+(horizon-max_delay), d] = True
+    df_plot[mask] = 0.
+    df_plot[(idx+1):, :] = 0.
+    df_plot[-1, :] = 0.
+
+    y_obs = df_plot.sum(axis=1)
+
+    dates = [days_to_date(start_date, days, past_units) for days in range(idx-horizon+1, idx+future_units+2)]
+    date_df = pd.DataFrame({'Date': dates})
+
+    ax_top.plot(date_df["Date"], y_true, label="True count", color="black")
+    ax_top.plot(date_df["Date"][:-1], y_obs[:-1], label=f"Observed up to {date_df.iloc[-(future_units+2), 0].strftime('%Y-%m-%d')}", color="crimson")
+    ax_top.plot(date_df["Date"], y_otd, label="Reported on day", c="grey")
+    ax_top.axvline(date_df.iloc[-(future_units+2)], color="black", linestyle="--", label="Current day")
+    ax_top.set_ylabel("Number of cases", fontsize="large")
+    ax_top.tick_params(axis='x', rotation=30)
+    ax_top.legend()
+    ax_top.set_xlim(date_df["Date"].iloc[0], date_df["Date"].iloc[-1])
+    ax_top.set_ylim(0)
+    ax_top.grid(alpha=0.2)
+    
+    # --- Plot max_delay_day in the bottom subplots ---
+    unlim_delay_array = np.array(df_delays)
+    fractions_reported = np.ndarray((365,))
+    cum_reported = np.ndarray((365,))
+    for d in range(365):
+        fractions_reported[d] = unlim_delay_array[:, d].sum()/unlim_delay_array.sum()
+        cum_reported[d] = unlim_delay_array[:, :(d+1)].sum()/unlim_delay_array.sum()
+
+    n_days_99 = next(i for i, value in enumerate(cum_reported) if value >= 0.99)
+
+    # Plot for cum_reported
+    ax_bottom_left.plot(cum_reported, label='Cumulative Reported Cases', color='grey')
+    ax_bottom_left.axhline(0.99, color='red', linestyle='-.', label='99% threshold')
+    ax_bottom_left.axvline(n_days_99, color='black', linestyle='--', label=f'Day {n_days_99}')
+    ax_bottom_left.set_xlabel('Days', fontsize="large")
+    ax_bottom_left.set_ylabel('Cumulative proportion of reported cases (%)', fontsize="large")
+    ax_bottom_left.legend()
+    ax_bottom_left.set_ylim(0, 1.05)
+    ax_bottom_left.set_xlim(-5, 365)
+    ax_bottom_left.grid(alpha=.2)
+
+    # Plot for fraction_reported
+    ax_bottom_right.plot(fractions_reported, label='Fraction Reported', color='dodgerblue')
+    ax_bottom_right.axvline(n_days_99, color='black', linestyle='--', label=f'Day {n_days_99}')
+    ax_bottom_right.set_xlabel('Days', fontsize="large")
+    ax_bottom_right.set_ylabel('Proportion of reported cases (%)', fontsize="large")
+    ax_bottom_right.legend()
+    ax_bottom_right.set_xlim(-5, 365)
+    ax_bottom_right.grid(alpha=.2)
+    
+    plt.tight_layout()
+    if save:
+        plt.savefig("../outputs/figures/combined_figure.svg")
+    plt.show()
+
 
 def plot_past_correction(model, past_units, max_delay, future_obs, weeks, dataset, save = False, random_split = True, padding = "both", dow = False, padding_val = 0, n_samples = 200, levels = [0.5, 0.95], state = "SP", idx = 787, test_idcs = None):
     model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std.
