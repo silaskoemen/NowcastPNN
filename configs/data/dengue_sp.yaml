@@ -1,0 +1,9 @@
+name: "dengue_sp"
+filepath: "data/DENGSP.csv" # Path relative to project root
+symptom_date_col: "DT_SIN_PRI"
+report_date_col: "DT_NOTIFIC"
+time_resolution: "daily"
+max_delay: 40
+past_units: 40
+train_size: 2133 # Default full training set size
+test_set_type: "recent" # 'recent' or 'random'

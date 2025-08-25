@@ -1,0 +1,16 @@
+defaults:
+  - data: dengue_sp_recent
+  - model: nowcastpnn_dow
+  - _self_
+
+project_info:
+  experiment_name: "NowcastPNN_Experiments"
+  run_name: "${model.name}_${data.name}" # Name is composed from other configs!
+
+training:
+  epochs: 200
+  learning_rate: 0.001
+  batch_size: 64
+  patience: 30
+
+seed: 1234

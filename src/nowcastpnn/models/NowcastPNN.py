@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from NegativeBinomial import NegBin as NB
+from nowcastpnn.distributions.NegativeBinomial import NegBin as NB
 
 ## For matrix-like (two-dimensional) input data
 class NowcastPNN(nn.Module):
