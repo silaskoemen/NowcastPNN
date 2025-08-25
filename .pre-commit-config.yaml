@@ -1,0 +1,34 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.5
+    hooks:
+    # Run the linter and automatically fix fixable issues
+    -   id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        # Only run on the specified directories
+        files: ^(src/|scripts/)/
+
+    # Run the formatter (replaces black)
+    -   id: ruff-format
+        # Only run on the specified directories
+        files: ^(src/|scripts/)/
+
+-   repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.372
+    hooks:
+    -   id: pyright
+        # Only run on the specified directories
+        files: ^(src/|scripts/)/
+        # If you have a pyrightconfig.json or use pyproject.toml for config,
+        # you might not need additional args.
+        additional_dependencies: ["torch", "pandas", "omegaconf"]
