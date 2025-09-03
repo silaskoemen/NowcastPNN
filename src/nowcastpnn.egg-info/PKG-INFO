@@ -131,6 +131,7 @@ Requires-Dist: networkx==3.2.1
 Requires-Dist: notebook==7.2.2
 Requires-Dist: notebook_shim==0.2.3
 Requires-Dist: numpy==1.26.2
+Requires-Dist: omegaconf
 Requires-Dist: openpyxl==3.1.2
 Requires-Dist: opt-einsum==3.3.0
 Requires-Dist: optax==0.2.3
@@ -147,6 +148,7 @@ Requires-Dist: pickleshare==0.7.5
 Requires-Dist: Pillow==10.0.0
 Requires-Dist: pip==24.2
 Requires-Dist: platformdirs==3.10.0
+Requires-Dist: pre-commit
 Requires-Dist: prometheus-client==0.19.0
 Requires-Dist: prompt-toolkit==3.0.39
 Requires-Dist: protobuf==4.25.3
@@ -259,9 +261,19 @@ The outputs folder contains the results of the analyses. The subdirectory [figur
 
 To run this project locally, follow these steps:
 
-1. Clone the repository: git clone https://github.com/silaskoemen/NowcastPNN.git
-2. Navigate to the project directory: cd NowcastPNN
-3. Install required packages (preferably in a virtual environment to avoid conflicts): pip install -r requirements.txt OR pip3 install -r requirements.txt
+1. Clone the repository: `git clone https://github.com/silaskoemen/NowcastPNN.git`
+2. Navigate to the project directory with `cd NowcastPNN`
+3. Run the setup command from the project root:
+
+    ```bash
+    make setup
+    ```
+
+4.  Activate the environment:
+
+    ```bash
+    micromamba activate nowcastpnn
+    ```
 
 ## Usage
 
@@ -281,4 +293,3 @@ Contributions are welcome. Please feel free to submit a pull request or open an 
 ## License
 
 This project is licensed under the [CC-BY-4.0](LICENSE) License.
-      

@@ -8,7 +8,7 @@ import pandas as pd
 from pathlib import Path
 
 # Assuming your refactored modules are in src/nowcastpnn
-from nowcastpnn import data, models, train, evaluate
+from nowcastpnn import data, models
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
 def run_experiment(cfg: DictConfig):
@@ -31,7 +31,7 @@ def run_experiment(cfg: DictConfig):
         mlflow.log_param("hydra_output_path", str(output_dir))
 
         # --- Data Loading ---
-        train_loader, val_loader, test_loader = data.load_nowcast_data(**cfg.data)
+        train_loader, val_loader, test_loader = data.get_dataset(**cfg.data, dow=cfg.model.use_dow)
 
         # --- Model Initialization ---
         model = models.get_model(cfg) # Using a factory function is cleaner
@@ -45,7 +45,7 @@ def run_experiment(cfg: DictConfig):
             early_stopper=early_stopper,
             # ... other params from cfg.training
         )
-        
+
         # Log metrics to MLflow
         for key, values in history.items():
             for i, value in enumerate(values):
@@ -72,11 +72,11 @@ def run_experiment(cfg: DictConfig):
                 "final_metrics": final_metrics
             }
         }
-        
+
         summary_path = output_dir / "summary.json"
         with open(summary_path, 'w') as f:
             json.dump(summary, f, indent=2)
-        
+
         print(f"Auditable summary saved to: {summary_path}")
 
 if __name__ == "__main__":

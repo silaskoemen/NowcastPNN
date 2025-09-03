@@ -1,9 +1,28 @@
 name: "dengue_sp"
-filepath: "data/DENGSP.csv" # Path relative to project root
+
+# --- Data Source ---
+filepath: "data/DENGSP.csv"
 symptom_date_col: "DT_SIN_PRI"
 report_date_col: "DT_NOTIFIC"
+
+# --- Core Processing Parameters ---
 time_resolution: "daily"
 max_delay: 40
 past_units: 40
-train_size: 2133 # Default full training set size
+train_split_perc: .75
+val_split_perc: .75
 test_set_type: "recent" # 'recent' or 'random'
+min_year: 2013 # Sanity filter for faulty date object
+max_year: 2020
+
+# --- Feature & Label Engineering (Defaults for standard nowcast) ---
+future_obs: 0             # How many future days of observations are known (0 for standard nowcast)
+vector_y: false           # False = scalar target (sum), True = vector target (counts per delay)
+triangle: true            # True = return full reporting triangle, False = return summed time series
+
+# --- Output Format (Defaults for training) ---
+# These are typically overridden from the command line for analysis scripts.
+output:
+  return_df: false
+  return_mat: false
+  return_number_obs: false

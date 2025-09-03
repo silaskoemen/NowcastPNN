@@ -2,11 +2,11 @@ import numpy as np
 import pandas as pd
 from epiweeks import Week, Year
 from datetime import datetime
-from plotting import days_to_date
+from nowcastpnn.utils.plotting import days_to_date
 
 def reporting_data(matrix: np.ndarray, idx: int, past_units: int = 40, max_delay: int = 40, future_obs: int = 0, vector_y = False, dow = False): # future units for future to correct positions
     """ Function for returning reporting data
-    
+
     Easiest with df and index, then just take past units and mask correctly"""
     assert future_obs < past_units, "Number of future observed units should be smaller than the number of past units included (otherwise exceeds the matrix)"
     assert future_obs >= 0, "Number of days of additional observations needs to be non-negative"
@@ -37,7 +37,7 @@ class ReportingDataset(Dataset):
         """
         Initialize the dataset with a start and end date.
         The dataset will generate matrices for each date within this range.
-        
+
         Parameters:
         - start_date: The start date for generating matrices.
         - end_date: The end date for generating matrices.
@@ -65,7 +65,7 @@ class ReportingDataset(Dataset):
     def __len__(self):
         # Calculate the number of days between 60 days after start_date and 46 days before end_date
         return len(self.df) - (self.past_units-1) - (self.max_delay-1)
-    
+
     def __getitem__(self, idx):
         # Calculate the date for the current iteration, considering the adjusted range
         idx += self.past_units-1
@@ -77,30 +77,30 @@ class ReportingDataset(Dataset):
             dow_val = torch.tensor(dow_val).to(self.device)
         else:
             matrix, label = reporting_data(self.df, idx=idx, past_units=self.past_units, max_delay=self.max_delay, future_obs=self.future_obs, vector_y = self.vector_y, dow=self.dow)
-        
+
         # Convert the matrix to a PyTorch tensor
         tensor = torch.from_numpy(matrix)
         tensor = tensor.to(device=self.device)
 
         if not self.triangle: # sum
             tensor = torch.sum(tensor, dim = 1)
-        
+
         # Compute the sum of the delays for the current date (row sum)
         label = torch.tensor([label]).to(self.device)
         if self.return_number_obs:
             num_obs = tensor.sum(axis = 1)[-(1+self.future_obs)].clone() # probably wrong
             label = (label, num_obs)
         if self.dow:
-            return (tensor/self.max_val, dow_val), label 
+            return (tensor/self.max_val, dow_val), label
         return tensor/self.max_val, label
         #return tensor, label
 
 def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40, state = "SP", future_obs = 0, return_df = False, return_mat = False, return_number_obs = False, vector_y = False, dow = False, path = "../data/derived/DENGSP.csv", reference_col = None, report_col = None):
     """ Have to return the iterable dataset, so first read in csv file, then convert to delay-format
     Then feed to iterable dataset and return that
-    
+
     Args:
-    
+
     Returns:
     """
     assert not (return_df and return_mat), "Only either dataframe or matrix can be returned"
@@ -117,7 +117,7 @@ def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40,
         dengdf = dengdf.dropna(subset=['DT_SIN_PRI', 'DT_NOTIFIC', "SEM_NOT", "SEM_PRI"])
         ## Know minimum year is 2013 and maximum 2020, so can discard faulty observations
         ## CHANGE if data before 2013 or after 2020 is added
-        
+
         # Week.week returns as int, können also einfach mit b-a (falls über Jahr einfach mit 52)
         dengdf["WK_SIN_PRI"] = dengdf["DT_SIN_PRI"].apply(lambda x: Week.fromdate(x))
         dengdf["WK_NOTIFIC"] = dengdf["DT_NOTIFIC"].apply(lambda x: Week.fromdate(x))
@@ -147,7 +147,7 @@ def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40,
         # Replace NaN values in numeric columns with 0
         for col in dengdf.columns.drop('DT_SIN_PRI'):
             dengdf[col] = dengdf[col].fillna(0)
-        
+
         dengdf.drop("DT_SIN_PRI", axis = 1, inplace = True)
 
     # Rename columns to reflect delays, internal checks
@@ -166,15 +166,39 @@ def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40,
     elif return_mat:
         return np.array(dengdf.values, dtype = np.float32)
     dengdf = np.array(dengdf.values, dtype = np.float32)
-    
+
     ## Define dataset
     return ReportingDataset(dengdf, max_val=max_val, triangle=triangle, past_units=past_units, max_delay=max_delay, future_obs=future_obs, vector_y = vector_y, dow = dow, return_number_obs = return_number_obs)
-    
+
+
+def load_nowcast_data(filepath: str, syptom_date_col: str = "DT_SIN_PRI", report_date_col: str = "DT_NOTIFIC", time_resolution: str = 'daily', max_delay: int = 40, past_units: int = 40, ):
+    """ Wrapper function to load nowcast data for training/evaluation
+
+    Args:
+        filepath: Path to the CSV file containing the data.
+        weeks: Whether to process data in weekly format.
+        triangle: Whether to return triangular matrices or summed vectors.
+        past_units: Number of past units (days/weeks) to consider.
+        max_delay: Maximum delay to consider.
+        state: State code for filtering data (default is "SP").
+        future_obs: Number of future observed units to include.
+        return_df: If True, return the raw DataFrame.
+        return_mat: If True, return the raw matrix.
+        return_number_obs: If True, return the number of observations along with the label.
+        vector_y: If True, return vector labels instead of scalar sums.
+        dow: If True, include day-of-week information.
+        reference_col: Column name for reference dates (if any).
+        report_col: Column name for report dates (if any).
+
+    Returns:
+        A ReportingDataset instance or raw data based on flags.
+    """
+    return get_dataset(weeks=weeks, triangle=triangle, past_units=past_units, max_delay=max_delay, state=state, future_obs=future_obs, return_df=return_df, return_mat=return_mat, return_number_obs=return_number_obs, vector_y=vector_y, dow=dow, path=filepath, reference_col=reference_col, report_col=report_col)
 
 
 """ Could use to find units of maximum value, return with dataset and then parse to NN as self.const
 counter = len(str(max_number))
-    
+
 # Calculate the nearest unit of length based on the counter
 nearest_unit = 10 ** (counter - 1)
 """
