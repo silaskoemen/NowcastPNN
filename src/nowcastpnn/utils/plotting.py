@@ -2,7 +2,7 @@ import numpy as np
 from torch.utils.data import Subset, DataLoader
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-from metrics import form_predictions
+from nowcastpnn.utils.metrics import form_predictions
 from scipy import stats
 import torch
 from sklearn.decomposition import PCA
@@ -12,7 +12,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import torch
 import pandas as pd
 plt.rcParams['font.family'] = "Times New Roman" #"cmr10"
-plt.rcParams.update({"axes.labelsize" : "large"}) # 'font.size': 11, 
+plt.rcParams.update({"axes.labelsize" : "large"}) # 'font.size': 11,
 #plt.rcParams['font.serif'] = "Computer Modern"
 
 models = ["Epinowcast", "RIVM", "NowcastPNN"]
@@ -37,7 +37,7 @@ def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], 
             preds[:, i] = np.squeeze(model(mat).sample().numpy()) if not dow else np.squeeze(model(mat, dow_val).sample().numpy())
         else:
             temp_counts = model(mat).sample().numpy()
-            preds[:, i] = form_predictions(temp_counts, y, future_obs=0)    
+            preds[:, i] = form_predictions(temp_counts, y, future_obs=0)
     preds_median = np.quantile(preds, 0.5, axis=1)
     #print(preds_median[2133:2353])
     intervals_dict = {}
@@ -46,7 +46,7 @@ def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], 
 
     if not total:
         y = y.sum(axis = 1)
-    
+
     plt.figure(figsize=(10, 6))
     plt.plot(y, label=r"True count", c = "black")
     #plt.plot(y_atm, label="reported on day", c = "darkgrey")
@@ -69,11 +69,11 @@ def plot_entire_confints(dataset, model, n_samples = 200, levels = [0.5, 0.95], 
     plt.xlim(left=0)
     if xlims is not None:
         plt.xlim(xlims)
-        plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_subset_{xlims[0]}_{xlims[1]}")            
+        plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_subset_{xlims[0]}_{xlims[1]}")
     elif not random_split:
         plt.xlim(2133, 2844)
         plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}_recent")
-    else: 
+    else:
         plt.savefig(fr"../outputs/figures/nowcast_{'week' if weeks else 'day'}")
     plt.show()
 
@@ -163,7 +163,7 @@ def visualize_embeddings(dim = 8):
 
 def plot_is_decomposition(epi_scores, rivm_scores, pnn_scores):
     #models = ["Epinowcast", "RIVM", "NowcastPNN"]
-    
+
     # Colors for each component
     colors_under = ['dodgerblue', 'black', 'crimson']
     colors_spread = ['aliceblue', 'lightgrey', 'mistyrose']  # almost white, a very bright hue of the original color
@@ -193,7 +193,7 @@ def plot_is_decomposition(epi_scores, rivm_scores, pnn_scores):
 
     # Move the legend outside the plot
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=3, frameon=False)
-    
+
     plt.tight_layout()
     plt.savefig(f"../outputs/figures/is_decompositions")
     plt.show()
@@ -398,7 +398,7 @@ def plot_sameday_nowcast_recent(test_loader, test_idcs, levels_pnn, levels_epi, 
     y = y.to("cpu").numpy()
 
     dates = [days_to_date("2013-01-01", days, past_units=40) for days in test_idcs]
-        
+
     # Create a DataFrame
     date_df = pd.DataFrame({'Date': dates})
 
@@ -459,7 +459,7 @@ def plot_sameday_nowcast_recent(test_loader, test_idcs, levels_pnn, levels_epi, 
 
 def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int = 30, past_units = 40, future_units = 0, start_date: str = "2013-01-01", weeks = False) -> None:
     """ For specific index (specific date), calculate the difference between true counts versus observed at date
-    
+
     Args:
         :df: [pd.DataFrame]: DataFrame containing the counts at all delay values for all dates
         :idx: [int]: Index for date to plot from, should be bigger than horizon
@@ -488,7 +488,7 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
     y_obs = df.sum(axis = 1)
 
     dates = [days_to_date(start_date, days, past_units) for days in range(idx - horizon+1, idx+future_units+2)]
-    
+
     # Create a DataFrame
     date_df = pd.DataFrame({'Date': dates})
 
@@ -505,7 +505,7 @@ def plot_distance_true_observed(df: pd.DataFrame, idx: str = 100, horizon: int =
     plt.ylabel("Number of cases", fontsize = "x-large")
     """date_df['MonthStart'] = date_df['Date'].apply(lambda x: x.replace(day=1))
     month_starts = date_df['MonthStart'].unique()
-    
+
     plt.xticks(month_starts, [date.strftime('%Y-%m-%d') for date in month_starts], rotation=45)"""
     plt.xticks(rotation = 30)
     plt.legend()
@@ -556,19 +556,19 @@ def plot_max_delay_day(df_unlimited_delay):
 def plot_nowcast_objective_delay_distribution(df_counts: pd.DataFrame, df_delays: pd.DataFrame, idx: int = 800, future_units = 0, horizon: int = 30, past_units: int = 40, start_date: str = "2013-01-01", fig_size: tuple[int, int] = (12, 8), save: bool = False) -> None:
     # Create a figure with a 2x2 grid
     fig = plt.figure(figsize=fig_size)
-    
+
     # Create a special grid layout
     gs = plt.GridSpec(2, 2, figure=fig)
-    
+
     # Create the top subplot that spans both columns
     ax_top = fig.add_subplot(gs[0, :])
-    
+
     # Create the two bottom subplots
     ax_bottom_left = fig.add_subplot(gs[1, 0])
     ax_bottom_right = fig.add_subplot(gs[1, 1])
-    
+
     # --- Plot the distance_true_observed in the top subplot ---
-    if isinstance(df_counts, pd.DataFrame): 
+    if isinstance(df_counts, pd.DataFrame):
         df_array = np.array(df_counts.values, dtype=np.float32)
     else:
         df_array = df_counts.copy()
@@ -602,7 +602,7 @@ def plot_nowcast_objective_delay_distribution(df_counts: pd.DataFrame, df_delays
     ax_top.set_xlim(date_df["Date"].iloc[0], date_df["Date"].iloc[-1])
     ax_top.set_ylim(0)
     ax_top.grid(alpha=0.2)
-    
+
     # --- Plot max_delay_day in the bottom subplots ---
     unlim_delay_array = np.array(df_delays)
     fractions_reported = np.ndarray((365,))
@@ -632,7 +632,7 @@ def plot_nowcast_objective_delay_distribution(df_counts: pd.DataFrame, df_delays
     ax_bottom_right.legend()
     ax_bottom_right.set_xlim(-5, 365)
     ax_bottom_right.grid(alpha=.2)
-    
+
     plt.tight_layout()
     if save:
         plt.savefig("../outputs/figures/combined_figure.svg")
@@ -676,15 +676,15 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
         x_max = idx_current + padding_val
         for r in range(idx_current+1, idx_current+padding_val+1):
             y_vals.append(dataset[r][1].cpu().numpy())
-    
+
 
     dates = [days_to_date("2013-01-01", days, past_units) for days in range(x_min, x_max+1)]
 
     cur_date = days_to_date("2013-01-01", idx, past_units)
-    
+
     # Create a DataFrame
     date_df = pd.DataFrame({'Date': dates})
-    
+
     for f in range(future_obs+1):
         model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}{'-rec' if not random_split else ''}{'-dow' if dow else ''}"))
         model.drop1.p, model.drop2.p = 0.1 * (1-f/future_obs) + 0.1, 0.15 * (1-f/future_obs)
@@ -695,7 +695,7 @@ def plot_past_correction(model, past_units, max_delay, future_obs, weeks, datase
                 preds[f, i] = model(mat).sample().numpy()
     preds = preds[::-1, :]
     preds_mean = np.quantile(preds, 0.5, axis=1)
-    
+
     intervals_dict = {}
     for l in levels:
         intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
@@ -753,7 +753,7 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
         for p in range(idx_current-future_obs, idx_current): # know last one from above, would add padding outside of them
             y_vals.append(dataset[p][1].cpu().numpy())
     y_vals.append(y)
-        
+
     x_min, x_max = idx_current-future_obs, idx_current
     if left:
         x_min -= padding_val
@@ -767,10 +767,10 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
     dates = [days_to_date("2013-01-01", days, past_units) for days in range(x_min, x_max+1)]
     cur_date = days_to_date("2013-01-01", idx, past_units)
     date_df = pd.DataFrame({'Date': dates})
-    
+
     for f in range(future_obs+1):
         model.load_state_dict(torch.load(f"./weights/weights-{past_units}-{max_delay}-{'week' if weeks else 'day'}-fut{f}{'-rec' if not random_split else ''}{'-dow' if dow else ''}"))
-        
+
         if random_split:
             model.drop1.p, model.drop2.p = 0.3 * (1-f/future_obs), 0.1 * (1-f/future_obs)
         else:
@@ -785,11 +785,11 @@ def past_correction_comparison(model, past_units, max_delay, future_obs, weeks, 
         preds[f, :][preds[f, :] < num_obs_vals[-(f+1)]] = num_obs_vals[-(f+1)]
     preds = preds[::-1, :]
     preds_median = np.quantile(preds, 0.5, axis=1)
-    
+
     intervals_dict = {}
     for l in levels:
         intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
-    
+
     epi_dict = epi_dict[(cur_date).strftime('%Y-%m-%d')]
     rivm_dict = rivm_dict[(cur_date).strftime('%Y-%m-%d')]
 
@@ -847,7 +847,7 @@ def compare_coverages(pnn_dict, epi_dict, rivm_dict):
 def compare_coverages_future_obs(pnn_coverages, epi_coverages, rivm_coverages, save = False):
     """ 3x1 plot of coverages vs 45° per day of future obs to see how behaves.
     """
-    
+
     models = [epi_coverages, pnn_coverages, rivm_coverages]
     model_names = ['Epinowcast', 'NowcastPNN', 'RIVM']
 
@@ -872,7 +872,7 @@ def compare_coverages_future_obs(pnn_coverages, epi_coverages, rivm_coverages, s
             actual_coverages = [day_coverage[level] for level in levels]
             #colors = [cmap(i/14)]
             ax.plot(levels, actual_coverages, marker='o', color=cmap(day_idx)[:3], label=f'Fut. obs.: {day_idx}')
-        
+
         # Set title, labels, and x-ticks
         ax.set_title(model_names[i], fontsize="x-large")
         ax.set_xlabel('Expected Coverage', fontsize="x-large")
@@ -905,7 +905,7 @@ def plot_training_size_is_wis_covs(n_training, pnn_is_decomp, pnn_wis, pnn_cover
     axes[0].hlines(1112.1429236476092, xmin = 450, xmax = 2200, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
     axes[0].hlines(974.3626620759587, xmin = 450, xmax = 2200, label = "RIVM", linestyle = "--", color = "black")
     axes[0].set_yticks(range(0, 7000, 1000))
-    axes[0].set_yticklabels(["0", "1000", "2000", "3000", "...", "13000", "14000"]) 
+    axes[0].set_yticklabels(["0", "1000", "2000", "3000", "...", "13000", "14000"])
     axes[0].set_ylim(0)
     axes[0].legend()
     axes[0].text(x = 680, y = 3580, s = "//", color = "crimson", fontsize = 27)
@@ -922,7 +922,7 @@ def plot_training_size_is_wis_covs(n_training, pnn_is_decomp, pnn_wis, pnn_cover
     axes[1].hlines(357.8707966239242, xmin = 450, xmax = 2200, label = "Epinowcast", linestyle = "-.", color = "dodgerblue")
     axes[1].hlines(313.4214658136002, xmin = 450, xmax = 2200, label = "RIVM", linestyle = "--", color = "black")
     axes[1].set_yticks(range(0, 3000, 500))
-    axes[1].set_yticklabels(["0", "500", "1000", "...", "5000", "5500"]) 
+    axes[1].set_yticklabels(["0", "500", "1000", "...", "5000", "5500"])
     axes[1].text(x = 710, y = 1370, s = "//", color = "crimson", fontsize = 27)
     axes[1].text(x = 635, y = 995, s = "/", color = "white", fontsize = 132, zorder = 2)
     axes[1].set_ylim(0)
@@ -940,7 +940,7 @@ def plot_training_size_is_wis_covs(n_training, pnn_is_decomp, pnn_wis, pnn_cover
         actual_coverages = [n_coverage[level] for level in levels]
         #colors = [cmap(i/14)]
         axes[2].plot(levels, actual_coverages, marker='o', color=cmap(n_idx)[:3], label=f'{n_training[n_idx]}')
-        
+
         # Set title, labels, and x-ticks
         axes[2].set_xlabel('Expected Coverage', fontsize="x-large")
         axes[2].set_ylabel('Actual Coverage', fontsize="x-large")
@@ -992,7 +992,7 @@ def plot_training_size_is_wis_covs_rand(n_training, pnn_is_decomp, pnn_wis, pnn_
         actual_coverages = [n_coverage[level] for level in levels]
         #colors = [cmap(i/14)]
         axes[2].plot(levels, actual_coverages, marker='o', color=cmap(n_idx)[:3], label=f'{n_training[n_idx]}')
-        
+
         # Set title, labels, and x-ticks
         axes[2].set_xlabel('Expected Coverage', fontsize="x-large")
         axes[2].set_ylabel('Actual Coverage', fontsize="x-large")
@@ -1054,7 +1054,7 @@ def plot_past_units_is_wis_covs(n_past_units, pnn_is_decomp, pnn_wis, pnn_covera
         actual_coverages = [n_coverage[level] for level in levels]
         #colors = [cmap(i/14)]
         axes[2].plot(levels, actual_coverages, marker='o', color=cmap(n_idx)[:3], label=f'{n_past_units[n_idx]}')
-        
+
         # Set title, labels, and x-ticks
         axes[2].set_xlabel('Expected Coverage', fontsize="x-large")
         axes[2].set_ylabel('Actual Coverage', fontsize="x-large")
@@ -1111,7 +1111,7 @@ def plot_is_wis_future_obs(pnn_is_decomp, epi_is_decomp, rivm_is_decomp, pnn_wis
             axes[1].barh(y_pos[2] - bar_width / 2, pnn_scores[0], color="crimson", height=bar_width, zorder=3, edgecolor = "black", linewidth = 0.4)
             axes[1].barh(y_pos[2] - bar_width / 2, pnn_scores[1], left=pnn_scores[0], color="mistyrose", height=bar_width, edgecolor = "black", linewidth = 0.4)
             axes[1].barh(y_pos[2] - bar_width / 2, pnn_scores[2], left=pnn_scores[0] + pnn_scores[1], color="#f5626e", height=bar_width, edgecolor = "black", linewidth = 0.4)
-        
+
     axes[1].set_yticks(y_pos)
     axes[1].set_yticklabels(models, fontsize="x-large")
     axes[1].set_xlabel('IS Decomposition', fontsize="x-large")
@@ -1139,11 +1139,11 @@ def plot_is_wis_future_obs(pnn_is_decomp, epi_is_decomp, rivm_is_decomp, pnn_wis
 def days_to_date(start_date, num_days, past_units = 1):
     """
     Converts number of days since start_date to the corresponding date.
-    
+
     Args:
     start_date (str): The start date in 'YYYY-MM-DD' format.
     num_days (int): Number of days from the start date.
-    
+
     Returns:
     datetime: The corresponding date.
     """

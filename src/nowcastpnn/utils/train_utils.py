@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
-from NegativeBinomial import NegBin
+from nowcastpnn.distributions.NegativeBinomial import NegBin
 
 class Sampler(object):
     r"""Base class for all Samplers.
@@ -19,7 +19,7 @@ class Sampler(object):
 
     def __len__(self):
         raise NotImplementedError
-    
+
 class SubsetSampler(Sampler):
     r""" Sampler for PyTorch that uses a given subset of indices to sample from. Not random, to use for reproducible samplings
     on the test set.
@@ -66,7 +66,7 @@ def get_loss(y_true, y_pred, loss_fct):
 def process_preds_observed(dist_pred, num_obs):
     """ Function to include information about the number of cases already observed.
     Any predicted values below this lower bound will be set to the lower bound
-    
+
     Args:
         dist_pred[torch.tensor]: tensor of dimension (batch)
     """
@@ -107,10 +107,10 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
             if not valid_gradients:
                 print("Detected inf or nan values in gradients. Not updating model parameters.")
                 optimizer.zero_grad()
-        
+
             optimizer.step()
             batch_loss += loss.item()
-        
+
         batch_loss /= len(train_loader)
         with torch.no_grad(): # performance on test/validation set
             model.eval()
@@ -134,51 +134,3 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         model.train()
         #if e % 50 == 0 or e == num_epochs-1:
         print(f"Epoch {e+1} - Train loss: {batch_loss:.3} - Val loss: {test_batch_loss:.3} - ES count: {early_stopper.get_count()}")
-    
-
-class EarlyStopper:
-    """ Class implementing early stopping. Theoretically, PyTorch lightning could be used, but this might be more rubust.
-    
-    As seen e.g. in https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch and adapted to include 
-    restoration of best weights.
-    """
-    def __init__(self, past_units, max_delay, weeks = False, future_obs = 0, state = "SP", triangle = True, patience = 30, random_split = False, dow = False, n_training = None, biggest_outbreak = False):
-        self.patience = patience
-        self.counter = 0
-        self.min_loss = float('inf')
-        self.past_units = past_units
-        self.max_delay = max_delay
-        self.weeks = weeks
-        self.future_obs = future_obs
-        self.state = state
-        self.triangle = triangle
-        self.random_split = random_split
-        self.dow = dow
-        self.n_training = n_training
-        self.biggest_outbreak = biggest_outbreak
-
-    def early_stop(self, val_loss, model):
-        if val_loss < self.min_loss:
-            self.min_loss = val_loss
-            self.counter = 0
-            ## Save best weights
-            if self.biggest_outbreak:
-                torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-fut{self.future_obs}-biggest{'-dow' if self.dow else ''}")
-            elif self.n_training is not None:
-                torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-fut{self.future_obs}{'-rec' if not self.random_split else ''}{'-dow' if self.dow else ''}-{self.n_training}")
-            else:
-                torch.save(model.state_dict(), f"./weights/weights-{self.past_units}-{self.max_delay}-{'week' if self.weeks else 'day'}-fut{self.future_obs}{'-rec' if not self.random_split else ''}{'-dow' if self.dow else ''}")
-        elif val_loss > self.min_loss:
-            self.counter += 1
-            if self.counter >= self.patience:
-                return True
-        return False
-    
-    def get_count(self):
-        return self.counter
-    
-    def get_patience(self):
-        return self.patience
-    
-    def reset(self):
-        self.counter = 0

@@ -7,8 +7,7 @@ import json
 import pandas as pd
 from pathlib import Path
 
-# Assuming your refactored modules are in src/nowcastpnn
-from nowcastpnn import data, models
+from nowcastpnn import data, models, train
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
 def run_experiment(cfg: DictConfig):
@@ -43,7 +42,7 @@ def run_experiment(cfg: DictConfig):
             train_loader=train_loader,
             val_loader=val_loader,
             early_stopper=early_stopper,
-            # ... other params from cfg.training
+            loss_fct=cfg.model.loss_fct,
         )
 
         # Log metrics to MLflow

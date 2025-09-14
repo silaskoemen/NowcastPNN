@@ -1,0 +1,4 @@
+name: 'model_training'
+
+# --- Training Parameters ---
+num_epochs: 500

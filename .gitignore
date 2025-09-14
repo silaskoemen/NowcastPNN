@@ -8,4 +8,6 @@
 **/.RData
 .RData
 
-/*.egg-info
+/*.egg-info# pixi environments
+.pixi/*
+!.pixi/config.toml

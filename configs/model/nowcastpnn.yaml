@@ -6,3 +6,4 @@ use_dow: true # Default to using Day-of-Week embeddings
 params:
   hidden_units: 30
   embedding_dim: 10 # This will be ignored if use_dow is false
+  loss_fct: 'nll'

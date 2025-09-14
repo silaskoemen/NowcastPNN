@@ -1,0 +1,6 @@
+artifact_location: mlflow-artifacts:/628152961102254664
+creation_time: 1757799325726
+experiment_id: '628152961102254664'
+last_update_time: 1757799325726
+lifecycle_stage: active
+name: nowcastpnn_train
