@@ -25,10 +25,10 @@ class NowcastPNN(nn.Module):
         #self.bnorm7 = nn.BatchNorm1d(num_features=hidden_units[1])
         self.bnorm_final = nn.BatchNorm1d(num_features=hidden_units[-1]) #hidden_units[1]/self.past_units for single model
         self.attn1 = nn.MultiheadAttention(embed_dim=self.max_delay, num_heads=1, batch_first=True)
-        self.drop1, self.drop2 = nn.Dropout(dropout_probs[0]), nn.Dropout(dropout_probs[1]) 
+        self.drop1, self.drop2 = nn.Dropout(dropout_probs[0]), nn.Dropout(dropout_probs[1])
         self.softplus = nn.Softplus()
         self.act = nn.SiLU()
-    
+
     def forward(self, x): ## Feed forward function, takes input of shape [batch, past_units, max_delay]
         #x = x.permute(0, 2, 1) # [batch, past_units, max_delay] -> [batch, max_delay, past_units]
         x = x.float() # maybe uncomment
@@ -84,7 +84,7 @@ class PNNSumDaily(nn.Module):
         self.drop1, self.drop2, self.drop3 = nn.Dropout(0.2), nn.Dropout(0.4), nn.Dropout(0.2)
         self.softplus = nn.Softplus()
         self.relu, self.silu = nn.ReLU(), nn.SiLU()
-    
+
     def forward(self, x):
         #print(x.size())
         #x = x + self.pos_embed(x)
@@ -139,17 +139,17 @@ class NowcastPNNDOW(nn.Module):
         #self.bnorm7 = nn.BatchNorm1d(num_features=hidden_units[1])
         self.bnorm_final = nn.BatchNorm1d(num_features=hidden_units[-1]) #hidden_units[1]/self.past_units for single model
         self.attn1 = nn.MultiheadAttention(embed_dim=self.max_delay, num_heads=1, batch_first=True)
-        self.drop1, self.drop2 = nn.Dropout(dropout_probs[0]), nn.Dropout(dropout_probs[1]) 
+        self.drop1, self.drop2 = nn.Dropout(dropout_probs[0]), nn.Dropout(dropout_probs[1])
         self.softplus = nn.Softplus()
         self.act = nn.SiLU()
-    
+
     def save_embeddings(self):
         """ Allows the user to save the embeddings if trained with a different dimension
         to load later and allow for reproducible training runs. Usage: run model with load_embed = False,
         then use model.save_embeddings() after training and use the model with load_embed = True afterwards.
         """
         torch.save(self.embed.weight, f"./weights/embedding_weights_{self.embedding_dim}")
-    
+
     def forward(self, rep_tri, dow): ## Feed forward function, takes input of shape [batch, past_units, max_delay]
         #x = x.permute(0, 2, 1) # [batch, past_units, max_delay] -> [batch, max_delay, past_units]
         x = rep_tri.float()
@@ -183,7 +183,7 @@ class NowcastPNNDOW(nn.Module):
         x = self.fcnb(self.bnorm_final(x))
         dist = NB(lbda = self.const*self.softplus(x[:, 0]), phi = (self.const**2)*self.softplus(x[:, 1])+1e-5)
         return torch.distributions.Independent(dist, reinterpreted_batch_ndims=1)
-    
+
 
 """ from prettytable import PrettyTable
 def count_parameters(model):

@@ -30,7 +30,9 @@ def run_experiment(cfg: DictConfig):
         mlflow.log_param("hydra_output_path", str(output_dir))
 
         # --- Data Loading ---
-        train_loader, val_loader, test_loader = data.get_dataset(**cfg.data, dow=cfg.model.use_dow)
+        train_loader, val_loader, test_loader = data.get_dataset(
+            **cfg.data, dow=cfg.model.use_dow
+        )
 
         # --- Model Initialization ---
         model = models.get_model(cfg) # Using a factory function is cleaner

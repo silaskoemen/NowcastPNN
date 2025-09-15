@@ -10,10 +10,10 @@ def dbc2csv(raw_filename):
     """ Function to convert .dbc file to .csv file
     Calls an R script to read and convert the file. Note that raw filename should NOT contain the .dbc suffix,
     it's added in the R script automatically for correct naming
-    
+
     Args:
     raw_filename [str]: String name of file
-    
+
     Returns:
     [bool]: status of conversion
     """
@@ -46,7 +46,6 @@ for r in regions: # takes ~9m
             if exists(f"../data/derived/DENG{r}{y}.csv"): # some have 2013 unavailable
                 temp_df = pd.read_csv(f"../data/derived/DENG{r}{y}.csv", index_col=0)
         else:
-            # Append rows 
+            # Append rows
             temp_df = pd.concat((temp_df, pd.read_csv(f"../data/derived/DENG{r}{y}.csv", index_col=0)), ignore_index = True)
     temp_df.to_csv(f"../data/derived/DENG{r}.csv")
-

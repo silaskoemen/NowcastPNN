@@ -1,5 +1,5 @@
 import numpy as np
-import torch 
+import torch
 from torch.utils.data import Subset, DataLoader
 import json
 import pickle
@@ -8,7 +8,7 @@ def RIVM_to_dict(levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], future_
     # Load the JSON file from the path
     with open(path, "r") as f:
         python_dict = json.load(f)
-    
+
     ## Change list of lists to arrays
     for date, lol in python_dict.items():
         lol = np.array(lol).reshape((14,9,2))
@@ -19,7 +19,7 @@ def Epi_to_dict(levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1], future_o
     # Load the JSON file from the path
     with open(path, "r") as f:
         python_dict = json.load(f)
-    
+
     ## Change list of lists to arrays
     for date, lol in python_dict.items():
         lol = np.array(lol).reshape((14,9,2))
@@ -63,17 +63,17 @@ def date_to_level_dict(date_dict, levels = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 
         level_dict[level] = np.array(level_dict[level])
         if level == 0:
             level_dict[level] = level_dict[level][:, 0]
-        else:    
+        else:
             level_dict[level] = (level_dict[level][:, 0], level_dict[level][:, 1])
-    
+
     return level_dict
 
 def IS(levels: list[float], intervals: dict, y: np.ndarray): #Y NOT PREDS
-    """ Weighted Interval Score. Decomposition of sharpness and penalties for 
+    """ Weighted Interval Score. Decomposition of sharpness and penalties for
     over- and underprediction. Lower is better.
-    
+
     Args:
-    alphas [list]: list of confidence levels 
+    alphas [list]: list of confidence levels
     intervals [dict]: dictionary of upper and lower bounds per confidence level
     preds [np.ndarray]: array of predictions
 
@@ -157,9 +157,9 @@ def PICA(levels: list[float], intervals: dict, y: np.ndarray):
     absolute difference between proportion and nominal interval level
 
     Lower is better, as it indicates closer matching of expected and actual coverages
-    
+
     Args:
-        :alphas: [list]: list of confidence levels 
+        :alphas: [list]: list of confidence levels
         :intervals: [dict]: dictionary of upper and lower bounds per confidence level
         :preds: [np.ndarray]: array of predictions
 
@@ -181,7 +181,7 @@ def PINAW(levels: list[float], minmaxes: tuple, intervals: dict):
     for given coverage probability is desired
 
     Args:
-    alphas [list]: list of confidence levels 
+    alphas [list]: list of confidence levels
     intervals [dict]: dictionary of upper and lower bounds per confidence level
     minmaxes [dict]: dictionary of minimum and maximum values (range) of sampled values per test point
 
@@ -204,7 +204,7 @@ def CWC(levels: list[float], minmaxes: tuple, intervals: dict, y: np.ndarray, et
     """ Coverage Width Criterion. Average width of interval with exponential penalty if coverage is not met
 
     Args:
-    alphas [list]: list of confidence levels 
+    alphas [list]: list of confidence levels
     intervals [dict]: dictionary of upper and lower bounds per confidence level
     minmaxes [dict]: dictionary of minimum and maximum values (range) of sampled values per test point
     preds [np.ndarray]: predictions (mean values)
@@ -242,7 +242,7 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     intervals_dict = {}
     for l in levels:
         intervals_dict[l] = (np.quantile(preds, (1-l)/2, 1), np.quantile(preds, (1+l)/2, 1))
-    
+
     coverages(levels, intervals_dict, y)
     PICA(levels, intervals_dict, y)
     CWC(levels, (min_preds, max_preds), intervals_dict, y)

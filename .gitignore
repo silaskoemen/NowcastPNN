@@ -11,3 +11,5 @@
 /*.egg-info# pixi environments
 .pixi/*
 !.pixi/config.toml
+
+/mlruns/

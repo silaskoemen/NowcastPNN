@@ -22,14 +22,14 @@ class NegBin(ExponentialFamily):
     @property
     def mean(self):
         return self.lbda
-    
+
     @property
     def mode(self):
         return torch.floor((self.phi-1)*self.lbda/self.phi)
-    
+
     def get_lbda(self):
         return self.lbda
-    
+
     def get_phi(self):
         return self.phi
 
@@ -53,7 +53,7 @@ class NegBin(ExponentialFamily):
         super(NegBin, new).__init__(batch_shape, validate_args=False)
         new._validate_args = self._validate_args
         return new
-    
+
     @property
     def _gamma(self):
         return torch.distributions.Gamma(
@@ -62,7 +62,7 @@ class NegBin(ExponentialFamily):
             rate=self.phi/self.lbda#,
             #validate_args=False,
         )
-    
+
     def sample(self, sample_shape=torch.Size()):
         with torch.no_grad():
             rate = self._gamma.sample(sample_shape=sample_shape)

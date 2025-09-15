@@ -1,0 +1,36 @@
+data:
+  name: dengue_sp
+  filepath: data/DENGSP.csv
+  symptom_date_col: DT_SIN_PRI
+  report_date_col: DT_NOTIFIC
+  time_resolution: daily
+  max_delay: 40
+  past_units: 40
+  train_split_perc: 0.75
+  val_split_perc: 0.75
+  test_set_type: recent
+  min_year: 2013
+  max_year: 2020
+  future_obs: 0
+  vector_y: false
+  triangle: true
+  output:
+    return_df: false
+    return_mat: false
+    return_number_obs: false
+model:
+  name: NowcastPNN
+  use_dow: true
+  params:
+    hidden_units: 30
+    embedding_dim: 10
+    loss_fct: nll
+project_info:
+  experiment_name: NowcastPNN_Experiments
+  run_name: ${model.name}_${data.name}
+training:
+  epochs: 200
+  learning_rate: 0.001
+  batch_size: 64
+  patience: 30
+seed: 1234

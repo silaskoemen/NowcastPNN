@@ -1,10 +1,10 @@
 defaults:
-  - data: dengue_sp_recent
-  - model: nowcastpnn_dow
+  - data: dengue_sp
+  - model: nowcastpnn
   - _self_
 
 project_info:
-  experiment_name: "NowcastPNN_Experiments"
+  experiment_name: "nowcastpnn_train"
   run_name: "${model.name}_${data.name}" # Name is composed from other configs!
 
 training:

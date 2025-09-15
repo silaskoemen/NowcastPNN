@@ -1,4 +1,4 @@
-### All functions are originally from https://github.com/kassteele/Nowcasting/tree/master and then adapted 
+### All functions are originally from https://github.com/kassteele/Nowcasting/tree/master and then adapted
 ### and extended for the analysis of this paper. Credit to the original creators.
 
 genPriorDelayDist <- function(mean.delay, max.delay, p = 0.999) {
@@ -10,21 +10,21 @@ genPriorDelayDist <- function(mean.delay, max.delay, p = 0.999) {
   #
   # Value
   # PMF as a vector of length max.delay + 1
-  # 
+  #
   # Details
   # Prior delay distribution is assumed to be Negative Binomial
   # Note that this prior delay distribution is disease specific!
   theta.delay <- exp(uniroot(
     f = function(x) qnbinom(p = p, mu = mean.delay, size = exp(x)) - max.delay,
     interval = c(0, 10), extendInt = "yes")$root)
-  
+
   if(theta.delay <= 0) theta.delay = 0.01
-  
+
   # We expect 1 case on day 1 of the outbreak
   # log(f.priordelay) is then the boundary constraint for the trend surface
   f.priordelay <- 1*dnbinom(x = 0:max.delay, mu = mean.delay, size = theta.delay)
   f.priordelay <- f.priordelay/sum(f.priordelay)
-  
+
   # Return output
   return(f.priordelay)
 }
@@ -58,78 +58,78 @@ dataSetup <- function(data, start.date, end.date = NULL, nowcast.date, days.back
   # d         delay (days)
   # g         boundary constraint, log(reporting intensity)
   # b         boundary constraint indicator (1 = active, 0 = not active)
-  
+
   #
   # Initial stuff
   #
-  
+
   # If there is no end.date, set end.date equal to nowcast.date
   if (is.null(end.date)) end.date <- nowcast.date
-  
+
   # Get maximum delay
   max.delay <- length(f.priordelay) - 1
-  
+
   # If there is no days.back, set days.back to two times max.delay
   if (is.null(days.back)) days.back <- 2*max.delay
-  
+
   # Get the dimensions of the reporting trapezium (= T x D1) and the entire outbreak (= T.true x D1)
   T      <- as.numeric(nowcast.date - start.date) + 1 # Number of days from start.date to nowcast.date
   T.true <- as.numeric(    end.date - start.date) + 1 # Number of days from start.date to end.date (truth, retrospectively)
   D      <- max.delay                                 # Maximum delay in days
   D1     <- D + 1                                     # Number of days from 0 to max.delay
-  
+
   # Set vectors t, t.true and d
   t      <- 1:T      # Days since start.date: 1, 2, ..., T
   t.true <- 1:T.true # Days since start.date: 1, 2, ..., T.true
   d      <- 0:D      # Delays 0, 1, ..., max.delay
-  
+
   #
   # Data operations
   #
-  
+
   data <- data %>%
     # Filter records with start.date <= onset.data <= end.date
-    filter(onset.date >= start.date & onset.date <= end.date) %>% 
-    
+    filter(onset.date >= start.date & onset.date <= end.date) %>%
+
     # Compute delay in days
-    mutate(delay = (report.date - onset.date) %>% as.numeric) %>% 
-    
+    mutate(delay = (report.date - onset.date) %>% as.numeric) %>%
+
     # Filter records with 0 <= delay <= max.delay
-    filter(delay >= 0 & delay <= max.delay) %>% 
-    
+    filter(delay >= 0 & delay <= max.delay) %>%
+
     # Categorize onset.date and delay
     # We need this to tabulate the cases by onset.date and delay
     mutate(
       onset.date.cat = onset.date  %>% cut(breaks = seq(from = start.date, to = end.date + 1, by = "day")),
-      delay.cat      = delay %>% factor(levels = 0:max.delay)) %>% 
-    
+      delay.cat      = delay %>% factor(levels = 0:max.delay)) %>%
+
     # Remove (numeric) delay
     select(-delay)
-  
+
   #
   # Construct reporting data
   #
-  
+
   # Setup the reporting trapezium data as a grid by Date and Delay
   rep.data <- expand.grid(
     Date = data$onset.date.cat %>% levels %>% as.Date,
-    Delay = d) %>% 
-    
+    Delay = d) %>%
+
     mutate(
       # Add t (t.true, actually) and d, to assist in the calculations
       t = (Date - start.date + 1) %>% as.integer,
       d = Delay,
-      
+
       # Add reporting category: Reported, Not yet reported, Future
       # Cases with t + d <= T have been reported
       Reported = ifelse(t + d <= T, yes = "Reported",
                         # Cases with t > T are in the future
                         no = ifelse(t > T, yes = "Future",
                                     # The rest has not been reported yet
-                                    no = "Not yet reported")) %>% 
+                                    no = "Not yet reported")) %>%
         # As factor
         factor(levels = c("Reported", "Not yet reported", "Future")),
-      
+
       # Add day of the week
       # [t = 3, d = 0], [t = 2, d = 1], [t = 1, d = 2] = constant, etc., so we have
       # Monday is reference (trick: 2007-01-01 is Monday)
@@ -143,18 +143,18 @@ dataSetup <- function(data, start.date, end.date = NULL, nowcast.date, days.back
               to = as.Date("2007-01-07"),
               by = "1 day"),
             abbreviate = TRUE)),
-      
+
       # Add tabulated cases by date and delay
       Cases = with(data, table(onset.date.cat, delay.cat)) %>% as.vector,
-      
+
       # Include record in estimation procedure? (1 = yes, 0 = no)
       # This is where nowcast.date - days.back + 1 <= Onset.Date <= nowcast.date
       Est = (Date >= (nowcast.date - days.back + 1) & Date <= nowcast.date) %>% as.integer)
-  
+
   #
   # Add boundary constraints to reporting data
   #
-  
+
   # g is value to keep surface below eta <= g
   # b is where the constraint is active
   g <- matrix(0, nrow = T.true, ncol = D1)
@@ -170,11 +170,11 @@ dataSetup <- function(data, start.date, end.date = NULL, nowcast.date, days.back
     mutate(
       b = b %>% as.vector,
       g = g %>% as.vector)
-  
+
   #
   # Return output
   #
-  
+
   return(rep.data)
 }
 
@@ -189,7 +189,7 @@ plotTrapezoid <- function(data, title = "Reporting trapezoid") {
   #
   # Value
   # ggplot object
-  
+
   # Make the plot
   plot <- ggplot(
     data = data,
@@ -216,10 +216,10 @@ plotTrapezoid <- function(data, title = "Reporting trapezoid") {
       plot.margin = margin(t = 0.1, r = 0.5, b = 0.1, l = 0.1, unit = "cm"),
       plot.title = element_text(hjust = 0.5),
       legend.position = "none")
-  
+
   # Return output
   return(plot)
-  
+
 }
 
 modelSetup <- function(data, ord = 2, kappa = list(u = 1e6, b = 1e6, w = 0.01, s = 1e-6)) {
@@ -236,60 +236,60 @@ modelSetup <- function(data, ord = 2, kappa = list(u = 1e6, b = 1e6, w = 0.01, s
   # List with:
   # matrices  List of model matrices and penalty matrices
   # kappa     Vector with fixed smoothing parameters for constraints
-  
+
   #
   # Initial stuff
   #
-  
+
   # Filter on records with Est == 1
   data <- data %>% filter(Est == 1)
-  
+
   # Extract dimensions
   t <- unique(data$t)
   d <- unique(data$d)
   T  <- length(t)
   D1 <- length(d)
-  
+
   #
   # Model matrices
   #
-  
+
   # B-spline basis matrix for smooth surface
   Bt <- bbase(x = t, k = max(4, floor( T/5)), deg = 3)
   Bd <- bbase(x = d, k = max(4, floor(D1/5)), deg = 3)
   B <- kronecker(Bd, Bt)
-  
+
   # Model matrix for weekday effect
   # Because intercept is included in B-spline basis, drop first column (Monday = reference) of X
   X <- sparse.model.matrix(~ Day, data = data)[, -1]
-  
+
   # cbind them together
   BX <- cbind(B, X)
-  
+
   # Get number of coefficients
   Kt <- ncol(Bt)
   Kd <- ncol(Bd)
   Kw <- ncol(X)
-  
+
   #
   # Difference operator and penalty matrices
   #
-  
+
   # Difference operator matrices
   Dt <- kronecker(Diagonal(Kd), diff(Diagonal(Kt), diff = ord)) # Smoothness in t direction
   Dd <- kronecker(diff(Diagonal(Kd), diff = 2), Diagonal(Kt))   # Smoothness in d direction
   Du <- kronecker(diff(Diagonal(Kd), diff = 2), Diagonal(Kt))   # Unimodal in d direction
-  
+
   # Penalty matrices
   Pt <- t(Dt) %*% Dt
   Pd <- t(Dd) %*% Dd
   Pw <- Diagonal(Kw)
   Ps <- Diagonal(Kt*Kd)
-  
+
   #
   # Fixed smoothing parameters
   #
-  
+
   # kappa.u and kappa.b are large for asymmetric penalty
   # kappa.s is very small for ridge penalty on surface
   # kappa.w is small for ridge penalty on weekday effect
@@ -297,15 +297,15 @@ modelSetup <- function(data, ord = 2, kappa = list(u = 1e6, b = 1e6, w = 0.01, s
   kappa.b <- kappa$b
   kappa.w <- kappa$w
   kappa.s <- kappa$s
-  
+
   #
   # Return output
   #
-  
+
   return(list(
     matrices = list(B = B, X = X, BX = BX, Pt = Pt, Pd = Pd, Du = Du, Ps = Ps, Pw = Pw),
     kappa = c(kappa.u = kappa.u, kappa.b = kappa.b, kappa.w = kappa.w, kappa.s = kappa.s)))
-  
+
 }
 
 calculate_bounds <- function(level) {
@@ -332,39 +332,39 @@ nowcast <- function(data, model, levels = c(0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.9
   # nowcast    Dataframe with nowcast statistics (med, lwr, upr) by date 1:T
   # F.nowcast  List of length emprical predictive distribution functions by date 1:T
   # f.delay    Dataframe with delay distribution (PMF) by date 1:T and delay 0:D
-  
+
   #
   # Initial stuff
   #
-  
+
   # Filter on records with Est == 1
   data <- data %>% filter(Est == 1)
-  
+
   # Extract data
   n <- data$Cases
   r <- 2 - as.numeric(data$Reported)
-  
+
   # Extract dimensions
   T  <- data$t %>% unique %>% length
   D1 <- data$d %>% unique %>% length
-  
+
   # Extract matrices
   B  <- model$matrices$B
   X  <- model$matrices$X
   BX <- model$matrices$BX
-  
+
   # Get number of coefficients
   Ks <- ncol(B)
   Kw <- ncol(X)
-  
+
   #
   # Estimate parameters
   #
-  
+
   # Initial alpha, beta and theta
   alpha.beta0 <- coef(lm(log(data$Cases + 0.1) ~ as.matrix(BX) - 1))
   theta0 <- 2
-  
+
   # Estimate parameters
   opt <- greedyGridSearch(
     # Function to be optimized
@@ -382,7 +382,7 @@ nowcast <- function(data, model, levels = c(0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.9
     model = model,
     alpha.beta = alpha.beta0,
     theta = theta0)
-  
+
   # Get final parameter estimates after optimization of lambda's
   fit <- estimateAlphaBetaTheta(
     lambda = opt$par,
@@ -395,11 +395,11 @@ nowcast <- function(data, model, levels = c(0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.9
   theta          <- fit$theta
   alpha <- alpha.beta[1:Ks]
   beta  <- alpha.beta[(Ks + 1):(Ks + Kw)]
-  
+
   #
   # Nowcast
   #
-  
+
   # 1. Generate n.samples of the parameter estimates
   #    alpha.beta.sim is a Ks + Kw x n.samples matrix
   n.samples <- 1000
@@ -408,12 +408,12 @@ nowcast <- function(data, model, levels = c(0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.9
       rnorm(n = (Ks + Kw)*n.samples),
       nrow = Ks + Kw,
       ncol = n.samples)
-  
+
   # 2. Generate n.sim realizations for the not-yet-reported eta and mu
   #    eta.sim and mu.sim are sum(!r) x n.samples matrices
   eta.sim <- as.matrix(BX[!r, ] %*% alpha.beta.sim)
   mu.sim  <- exp(eta.sim)
-  
+
   # 3. Generate n.samples for the not-yet-reported cases
   #    The already reported cases n are fixed!
   #    n.sim is an T x D1 x n.samples array
@@ -424,16 +424,16 @@ nowcast <- function(data, model, levels = c(0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.9
       mu = mu.sim[, i],
       size = theta)
   }
-  
+
   n.sim[is.na(n.sim)] <- 0
-  
+
   # 4. Sum over delays by date (keep margins 1 and 3) = epicurve
   #    N.sim is a T x n.samples matrix
   N.sim <- apply(
     X = n.sim,
     MARGIN = c(1, 3),
     FUN = sum)
-  
+
   # 5. Get empirical cumulative predictive distribution function by date (keep margin 1)
   #    F.N is a list of length T with ECDFs
   F.N <- apply(
@@ -446,33 +446,33 @@ nowcast <- function(data, model, levels = c(0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.9
     FUN = quantile,
     probs = unlist(lapply(levels, calculate_bounds)))) # müsste oben unten für alle machen
   colnames(N.stat) <- unlist(lapply(levels, calculate_bounds))
-  
+
   #
   # Delay distribution (PMF) by date
   #
-  
+
   # Surface is for Monday, but is the same for any other day because of division by row sums
   # f.delay is a T x D1 matrix
   eta.s <- B %*% alpha %>% as.vector %>% matrix(nrow = T, ncol = D1)
   mu.s <- exp(eta.s)
   f.delay <- mu.s/rowSums(mu.s)
-  
+
   #
   # Return output
   #
-  
+
   return(list(
     # Nowcast statistics by date
     nowcast = cbind(
       data.frame(Date = data$Date %>% unique),
       as.data.frame(N.stat)),
     # Nowcast predictive distributions (CDF) by date
-    F.nowcast = F.N, 
+    F.nowcast = F.N,
     # Delay distribution (PMF) by date
     f.delay = cbind(
       data[, c("Date", "Delay", "Reported")],
       data.frame(f.delay = as.vector(f.delay)))))
-  
+
 }
 
 plotEpicurve <- function(data, title = "Epicurve") {
@@ -486,12 +486,12 @@ plotEpicurve <- function(data, title = "Epicurve") {
   #
   # Value
   # ggplot object
-  
+
   # Prepare data for epicurve plot
   tmp <- data %>%
     group_by(Date, Reported) %>%
     summarize(Cases = sum(Cases))
-  
+
   # Make the plot
   plot <- ggplot(
     data = tmp,
@@ -518,10 +518,10 @@ plotEpicurve <- function(data, title = "Epicurve") {
       plot.margin = margin(t = 0.1, r = 0.5, b = 0.1, l = 0.1, unit = "cm"),
       plot.title = element_text(hjust = 0.5),
       legend.position = "top")
-  
+
   # Return output
   return(plot)
-  
+
 }
 
 plotTrapezoid <- function(data, title = "Reporting trapezoid") {
@@ -535,7 +535,7 @@ plotTrapezoid <- function(data, title = "Reporting trapezoid") {
   #
   # Value
   # ggplot object
-  
+
   # Make the plot
   plot <- ggplot(
     data = data,
@@ -562,10 +562,10 @@ plotTrapezoid <- function(data, title = "Reporting trapezoid") {
       plot.margin = margin(t = 0.1, r = 0.5, b = 0.1, l = 0.1, unit = "cm"),
       plot.title = element_text(hjust = 0.5),
       legend.position = "none")
-  
+
   # Return output
   return(plot)
-  
+
 }
 
 bbase <- function(x, x.min = min(x), x.max = max(x), k = 15, deg = 3, sparse = TRUE) {
@@ -576,7 +576,7 @@ bbase <- function(x, x.min = min(x), x.max = max(x), k = 15, deg = 3, sparse = T
   # Generates design matrix for B-splines
   #
   # Arguments
-  # x       A numeric vector of values at which to evaluate the B-spline functions 
+  # x       A numeric vector of values at which to evaluate the B-spline functions
   # x.min   Lowest value, min(x)
   # x.max   Highest value, max(x)
   # k       Number of B-spline basis functions
@@ -585,7 +585,7 @@ bbase <- function(x, x.min = min(x), x.max = max(x), k = 15, deg = 3, sparse = T
   #
   # Value
   # Matrix B-spline basis functions
-  
+
   dx <- (x.max - x.min)/(k - deg)
   knots <- seq(from = x.min - deg*dx, to = x.max + deg*dx, by = dx)
   B <- splines::splineDesign(x = x, knots = knots, ord = deg + 1, outer.ok = TRUE, sparse = sparse)
@@ -593,9 +593,9 @@ bbase <- function(x, x.min = min(x), x.max = max(x), k = 15, deg = 3, sparse = T
 }
 
 greedyGridSearch <- function(fn, lower, upper, n.grid, start, logscale, ...) {
-  # 
+  #
   # Optimization over a parameter grid
-  # 
+  #
   # Description
   # This function does a greedy grid search in any dimension
   #
@@ -619,7 +619,7 @@ greedyGridSearch <- function(fn, lower, upper, n.grid, start, logscale, ...) {
   # A greedy algorithm is an algorithmic paradigm that follows the problem solving heuristic of making the
   # locally optimal choice at each stage with the hope of finding a global optimum. In many problems,
   # a greedy strategy works well if there are no local optima.
-  
+
   # Get dimension of parameter space
   n.par <- length(lower)
   # Apply log-transformation to elements of lower and upper?
@@ -701,20 +701,20 @@ greedyGridSearch <- function(fn, lower, upper, n.grid, start, logscale, ...) {
 
 # Estimate alpha, beta and theta given lambda
 estimateAlphaBetaTheta <- function(lambda, data, model, alpha.beta, theta) {
-  
+
   #
   # Initial stuff
   #
-  
+
   if(theta < 0) theta = 0.1
   epsilon = 1e-4
-  
+
   # Extract data
   y <- data$Cases
   r <- 2 - as.numeric(data$Reported)
   b <- data$b
   g <- data$g
-  
+
   # Extract matrices
   B <- model$matrices$B
   X <- model$matrices$X
@@ -724,21 +724,21 @@ estimateAlphaBetaTheta <- function(lambda, data, model, alpha.beta, theta) {
   Du <- model$matrices$Du
   Ps <- model$matrices$Ps
   Pw <- model$matrices$Pw
-  
+
   # Extract fixed smoothing parameters
   kappa.u <- model$kappa["kappa.u"]
   kappa.b <- model$kappa["kappa.b"]
   kappa.w <- model$kappa["kappa.w"]
   kappa.s <- model$kappa["kappa.s"]
-  
+
   # Get number of coefficients
   Ks <- ncol(B)
   Kw <- ncol(X)
-  
+
   #
   # Estimate parameters
   #
-  
+
   # Initial log-likelihood for the negative binomial distribution
   ll <- 10; ll.old <- 1
   it <- 1
@@ -755,34 +755,34 @@ estimateAlphaBetaTheta <- function(lambda, data, model, alpha.beta, theta) {
     mu <- exp(eta)
     # Update theta - for some values goes to 0 so ensure doesn't happen
     terminate_early <- FALSE  # Global flag for early termination
-    
+
     # Custom objective function with early stopping
     objective_function <- function(log.theta) {
       # Transform log.theta back to theta
       theta_val <- exp(log.theta)
-      
+
       # Early return if theta drops below epsilon
       if (theta_val < epsilon) {
         cat("Theta value dropped below epsilon. Stopping optimization.\n")
         terminate_early <<- TRUE  # Set the global flag to indicate termination
         return(Inf)  # Return Inf to stop optimization
       }
-      
+
       # Calculate the negative log-likelihood
       negative_log_likelihood <- -sum(r * dnbinom(x = y, mu = mu, size = theta_val, log = TRUE))
-      
+
       # Debugging outputs to trace values
       #cat("theta:", theta_val, " log(theta):", log.theta, " negative log-likelihood:", negative_log_likelihood, "\n")
-      
+
       # Ensure the result is finite
       if (!is.finite(negative_log_likelihood)) {
         cat("Encountered non-finite negative log-likelihood.\n")
         return(Inf)
       }
-      
+
       return(negative_log_likelihood)
     }
-    
+
     # Run the optimization within tryCatch to handle potential errors
     result <- tryCatch({
       opt.theta <- optim(
@@ -799,14 +799,14 @@ estimateAlphaBetaTheta <- function(lambda, data, model, alpha.beta, theta) {
       cat("Optimization failed: ", e$message, "\n")
       list(success = FALSE, opt.theta = NULL)
     })
-    
+
     # Check the result and set theta accordingly
     if (result$success && !terminate_early) {
       theta <- exp(result$opt.theta$par)  # Use the optimized value
     } else {
       theta <- epsilon  # Set theta to epsilon if optimization failed or early termination
     }
-    
+
     # Weights: W = [1/Var(y)]*dmu.deta^2
     W <- (1/(mu + mu^2/theta))*mu^2
     # Working variable: z = eta + (y - mu)*(1/dmu.deta)
@@ -840,20 +840,20 @@ estimateAlphaBetaTheta <- function(lambda, data, model, alpha.beta, theta) {
     # Update iterator
     it <- it + 1
   }
-  
+
   #
   # Calculate information criterion
   #
-  
+
   # Calculate effective dimension
   ed <- sum(diag(XWX.P.inv %*% XWX))
   # Calculate BIC
   bic <- -2*ll + log(sum(r))*ed
-  
+
   #
   # Return output
   #
-  
+
   return(list(
     alpha.beta = alpha.beta, alpha.beta.cov = XWX.P.inv,
     theta = theta,

@@ -14,6 +14,8 @@ val_split_perc: .75
 test_set_type: "recent" # 'recent' or 'random'
 min_year: 2013 # Sanity filter for faulty date object
 max_year: 2020
+weeks: false  # Whether to use weekly aggregation (True) or daily (False)
+use_dow: true  # Whether to use day-of-week for modelling
 
 # --- Feature & Label Engineering (Defaults for standard nowcast) ---
 future_obs: 0             # How many future days of observations are known (0 for standard nowcast)
