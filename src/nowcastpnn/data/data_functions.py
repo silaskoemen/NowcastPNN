@@ -2,7 +2,14 @@ import numpy as np
 import pandas as pd
 from epiweeks import Week, Year
 from datetime import datetime
+
+from sklearn.model_selection import train_test_split as TTS
+from torch.utils.data.sampler import SubsetRandomSampler as SRS
+from torch.utils.data import Dataset, DataLoader
+
 from nowcastpnn.utils.plotting import days_to_date
+from nowcastpnn.utils import SubsetSampler as SS
+
 
 def reporting_data(matrix: np.ndarray, idx: int, past_units: int = 40, max_delay: int = 40, future_obs: int = 0, vector_y = False, dow = False): # future units for future to correct positions
     """ Function for returning reporting data
@@ -96,7 +103,7 @@ class ReportingDataset(Dataset):
         #return tensor, label
 
 
-def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40, state = "SP", future_obs = 0, return_df = False, return_mat = False, return_number_obs = False, vector_y = False, dow = False, path = "../data/derived/DENGSP.csv", reference_col = None, report_col = None):
+def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40, future_obs = 0, return_df = False, return_mat = False, return_number_obs = False, vector_y = False, dow = False, path = "../data/derived/DENGSP.csv", reference_date_col = 'DT_SIN_PRI', report_date_col = 'DT_NOTIFIC'):
     """ Have to return the iterable dataset, so first read in csv file, then convert to delay-format
     Then feed to iterable dataset and return that
 
@@ -106,22 +113,22 @@ def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40,
     """
     assert not (return_df and return_mat), "Only either dataframe or matrix can be returned"
     ## Add reference_col and report_col so use reference_date and report_date if None and given strings otherwise
-    dengdf = pd.read_csv(path, index_col=0)#pd.read_csv(f"../data/derived/DENG{state}.csv", index_col=0)
+    dengdf = pd.read_csv(path, index_col=0, low_memory=False)  # DTypeWarning of mixed dtypes otherwise
     date_format = "%Y-%m-%d"
-    dengdf['DT_NOTIFIC'] = pd.to_datetime(dengdf['DT_NOTIFIC'], format=date_format)
-    dengdf['DT_SIN_PRI'] = pd.to_datetime(dengdf['DT_SIN_PRI'], format=date_format)
+    dengdf[report_date_col] = pd.to_datetime(dengdf[report_date_col], format=date_format)
+    dengdf[reference_date_col] = pd.to_datetime(dengdf[reference_date_col], format=date_format)
 
     ## Filter to only take rows with onset after 2012 (2013-1, others assumed to be faulty data)
-    dengdf = dengdf.loc[((dengdf["DT_SIN_PRI"].dt.year > 2012) & (dengdf["DT_SIN_PRI"].dt.year < 2021) & (dengdf["DT_NOTIFIC"].dt.year > 2012) & (dengdf["DT_NOTIFIC"].dt.year < 2021))]
+    dengdf = dengdf.loc[((dengdf[reference_date_col].dt.year > 2012) & (dengdf[reference_date_col].dt.year < 2021) & (dengdf["DT_NOTIFIC"].dt.year > 2012) & (dengdf["DT_NOTIFIC"].dt.year < 2021))]
 
     if weeks:
-        dengdf = dengdf.dropna(subset=['DT_SIN_PRI', 'DT_NOTIFIC', "SEM_NOT", "SEM_PRI"])
+        dengdf = dengdf.dropna(subset=[reference_date_col, report_date_col, "SEM_NOT", "SEM_PRI"])
         ## Know minimum year is 2013 and maximum 2020, so can discard faulty observations
         ## CHANGE if data before 2013 or after 2020 is added
 
         # Week.week returns as int, können also einfach mit b-a (falls über Jahr einfach mit 52)
-        dengdf["WK_SIN_PRI"] = dengdf["DT_SIN_PRI"].apply(lambda x: Week.fromdate(x))
-        dengdf["WK_NOTIFIC"] = dengdf["DT_NOTIFIC"].apply(lambda x: Week.fromdate(x))
+        dengdf["WK_SIN_PRI"] = dengdf[reference_date_col].apply(lambda x: Week.fromdate(x))  # type: ignore
+        dengdf["WK_NOTIFIC"] = dengdf[report_date_col].apply(lambda x: Week.fromdate(x))  # type: ignore
         ## Convert wk sin pri and notific to cdcformat, can join with other df from fct
         dengdf["WK_SIN_PRI_INT"] = dengdf["WK_SIN_PRI"].apply(lambda x: x.week)
         dengdf["WK_NOTIFIC_INT"] = dengdf["WK_NOTIFIC"].apply(lambda x: x.week)
@@ -130,26 +137,26 @@ def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40,
         ## If do not want as triangle, could look at higher max_delay values bc summed either way
         dengdf = dengdf.groupby('WK_SIN_PRI')['delay'].apply(lambda x: x.value_counts().reindex(range(max_delay))).unstack(fill_value=0)
     else:
-        dengdf = dengdf.dropna(subset=['DT_SIN_PRI', 'DT_NOTIFIC'])
-        dengdf['delay'] = (dengdf['DT_NOTIFIC'] - dengdf['DT_SIN_PRI']).dt.days
-        dengdf = dengdf.groupby('DT_SIN_PRI')['delay'].apply(lambda x: x.value_counts().reindex(range(max_delay))).unstack(fill_value=0)
-        dengdf["DT_SIN_PRI"] = pd.to_datetime(dengdf.index)
+        dengdf = dengdf.dropna(subset=[reference_date_col, report_date_col])
+        dengdf['delay'] = (dengdf[report_date_col] - dengdf[reference_date_col]).dt.days
+        dengdf = dengdf.groupby(reference_date_col)['delay'].apply(lambda x: x.value_counts().reindex(range(max_delay))).unstack(fill_value=0)
+        dengdf[reference_date_col] = pd.to_datetime(dengdf.index)
         dengdf.index = range(len(dengdf))
-        start_date = dengdf['DT_SIN_PRI'].min()
-        end_date = dengdf['DT_SIN_PRI'].max()
+        start_date = dengdf[reference_date_col].min()
+        end_date = dengdf[reference_date_col].max()
 
         # Create a new DataFrame with a continuous range of dates
-        date_range_df = pd.DataFrame({'DT_SIN_PRI': pd.date_range(start=start_date, end=end_date)})
+        date_range_df = pd.DataFrame({reference_date_col: pd.date_range(start=start_date, end=end_date)})
         print(len(date_range_df), start_date, end_date)
 
         # Merge the original DataFrame with the date range DataFrame, filling missing values with 0
-        dengdf = pd.merge(date_range_df, dengdf, how='left', on='DT_SIN_PRI')
+        dengdf = pd.merge(date_range_df, dengdf, how='left', on=reference_date_col)
 
         # Replace NaN values in numeric columns with 0
-        for col in dengdf.columns.drop('DT_SIN_PRI'):
+        for col in dengdf.columns.drop(reference_date_col):
             dengdf[col] = dengdf[col].fillna(0)
 
-        dengdf.drop("DT_SIN_PRI", axis = 1, inplace = True)
+        dengdf.drop(reference_date_col, axis = 1, inplace = True)
 
     # Rename columns to reflect delays, internal checks
     dengdf.columns = [f'delay_{col}' for col in dengdf.columns]
@@ -172,29 +179,58 @@ def get_dataset(weeks = False, triangle = True, past_units = 40, max_delay = 40,
     return ReportingDataset(dengdf, max_val=max_val, triangle=triangle, past_units=past_units, max_delay=max_delay, future_obs=future_obs, vector_y = vector_y, dow = dow, return_number_obs = return_number_obs)
 
 
-def load_nowcast_data(filepath: str, syptom_date_col: str = "DT_SIN_PRI", report_date_col: str = "DT_NOTIFIC", time_resolution: str = 'daily', max_delay: int = 40, past_units: int = 40, ):
-    """ Wrapper function to load nowcast data for training/evaluation
+def get_dataset_config(cfg):
+    return get_dataset(
+        weeks=cfg.data.weeks,
+        triangle=cfg.data.triangle,
+        past_units=cfg.data.past_units,
+        max_delay=cfg.data.max_delay,
+        future_obs=cfg.data.future_obs,
+        return_df=cfg.data.output.return_df,
+        return_mat=cfg.data.output.return_mat,
+        return_number_obs=cfg.data.output.return_number_obs,
+        vector_y=cfg.data.vector_y,
+        dow=cfg.data.use_dow,
+        path=cfg.data.filepath,
+        reference_date_col=cfg.data.reference_date_col,
+        report_date_col=cfg.data.report_date_col,
+    )
+
+
+def get_loaders_from_dataset(dataset, cfg):
+    """ Utility function to create DataLoader objects for training, validation, and testing.
 
     Args:
-        filepath: Path to the CSV file containing the data.
-        weeks: Whether to process data in weekly format.
-        triangle: Whether to return triangular matrices or summed vectors.
-        past_units: Number of past units (days/weeks) to consider.
-        max_delay: Maximum delay to consider.
-        state: State code for filtering data (default is "SP").
-        future_obs: Number of future observed units to include.
-        return_df: If True, return the raw DataFrame.
-        return_mat: If True, return the raw matrix.
-        return_number_obs: If True, return the number of observations along with the label.
-        vector_y: If True, return vector labels instead of scalar sums.
-        dow: If True, include day-of-week information.
-        reference_col: Column name for reference dates (if any).
-        report_col: Column name for report dates (if any).
+        dataset: The dataset to split and load.
+        batch_size: Number of samples per batch.
+        val_split: Proportion of the dataset to use for validation.
+        test_split: Proportion of the dataset to use for testing.
+        shuffle: Whether to shuffle the dataset before splitting.
+        random_seed: Seed for random number generator (for reproducibility).
 
     Returns:
-        A ReportingDataset instance or raw data based on flags.
+        A tuple of (train_loader, val_loader, test_loader).
     """
-    return get_dataset(weeks=weeks, triangle=triangle, past_units=past_units, max_delay=max_delay, state=state, future_obs=future_obs, return_df=return_df, return_mat=return_mat, return_number_obs=return_number_obs, vector_y=vector_y, dow=dow, path=filepath, reference_col=reference_col, report_col=report_col)
+    if cfg.data.random_split:
+        all_idcs = range(dataset.__len__())
+        train_idcs, test_idcs = TTS(all_idcs, test_size=cfg.data.test_split_size, shuffle=cfg.data.shuffle, random_state=cfg.seed)
+        train_idcs, val_idcs = TTS(train_idcs, test_size=cfg.data.val_split_size, shuffle=cfg.data.shuffle, random_state=cfg.seed)
+        VAL_BATCH_SIZE, TEST_BATCH_SIZE = len(val_idcs), len(test_idcs)
+    else:
+        """if cfg.data.weeks: # could also do random split, for now last indices as test
+            train_idcs, test_idcs = range(300), range(300, dataset.__len__())
+            TEST_BATCH_SIZE = dataset.__len__() - 300
+        else:"""
+        train_idcs, test_idcs = range(int((1-cfg.data.test_split_size)*dataset.__len__())), range(int((1-cfg.data.test_split_size)*dataset.__len__()), dataset.__len__()) # 2844 total obs - 711 test, still 25% even without random split, last outbreak 2353
+        train_idcs, val_idcs = TTS(train_idcs, test_size=cfg.data.val_split_size, shuffle=cfg.data.shuffle, random_state=cfg.seed)
+        VAL_BATCH_SIZE, TEST_BATCH_SIZE = len(val_idcs), len(test_idcs)
+
+    ## Define generator so sampling during training is deterministic and reproducible
+    g = torch.Generator()
+    g.manual_seed(cfg.seed)
+    train_sampler, val_sampler, test_sampler = SRS(train_idcs, generator=g), SRS(val_idcs), SS(test_idcs)
+    train_loader, val_loader, test_loader = DataLoader(dataset, batch_size=cfg.training.batch_size, sampler=train_sampler), DataLoader(dataset, batch_size=VAL_BATCH_SIZE, sampler=val_sampler, shuffle=False), DataLoader(dataset, batch_size=TEST_BATCH_SIZE, sampler=test_sampler, shuffle=False)
+    return train_loader, val_loader, test_loader
 
 
 """ Could use to find units of maximum value, return with dataset and then parse to NN as self.const

@@ -1,4 +1,5 @@
 import torch
+import logging
 
 from nowcastpnn.evaluate.losses import get_loss
 from .early_stopper import EarlyStopper
@@ -25,6 +26,7 @@ def validate_gradients(model):
                 return False
     return True
 
+
 def train(model, train_loader, val_loader, early_stopper: EarlyStopper, loss_fct: str = 'nll', num_epochs: int = 500, learning_rate: float = 3e-4, device = torch.device("mps"), dow: bool = False, num_obs: bool = False, return_history: bool = False):
     """
     Main training loop.
@@ -47,7 +49,7 @@ def train(model, train_loader, val_loader, early_stopper: EarlyStopper, loss_fct
             loss.backward()
 
             if not validate_gradients(model):
-                print("Detected inf/NaN values in gradients. Not updating model parameters.")
+                logging.warning("Detected inf/NaN values in gradients. Not updating model parameters.")
                 optimizer.zero_grad()
                 continue
             optimizer.step()
@@ -69,13 +71,13 @@ def train(model, train_loader, val_loader, early_stopper: EarlyStopper, loss_fct
             history["train_loss"].append(avg_train_loss)
             history["val_loss"].append(avg_val_loss)
 
-        print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_train_loss:.4f} - Val Loss: {avg_val_loss:.4f} - ES Count: {early_stopper.get_count()}")
-
         if early_stopper(avg_val_loss, model):
-            print("Early stopping triggered.")
+            logging.info("Early stopping triggered.")
             break
 
-    print("Training finished. Loading best model weights.")
+        logging.info(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {avg_train_loss:.2f} - Val Loss: {avg_val_loss:.2f} - ES Count: {early_stopper.get_count()}")
+
+    logging.info("Training finished. Loading best model weights.")
     if early_stopper.best_model_state:
         model.load_state_dict(early_stopper.best_model_state)
 

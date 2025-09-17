@@ -1,0 +1,8 @@
+name: "NowcastMLP"
+
+params:
+  hidden_units: 30
+  embedding_dim: 10 # This will be ignored if use_dow is false
+  loss_fct: 'nll'
+
+mlflow_run_string: "hu${.params.hidden_units}_ed${.params.embedding_dim}_lf${.params.loss_fct}"

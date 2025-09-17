@@ -1,6 +1,10 @@
+import os
+
 import torch.nn as nn
 import torch
+
 from nowcastpnn.distributions.NegativeBinomial import NegBin as NB
+
 
 ## For matrix-like (two-dimensional) input data
 class NowcastPNN(nn.Module):
@@ -124,7 +128,13 @@ class NowcastPNNDOW(nn.Module):
         self.const = 10000 # if not normalized, take constant out
         self.embedding_dim = embedding_dim
         if load_embed:
-            self.embed = nn.Embedding.from_pretrained(torch.load(f"./weights/embedding_weights_{embedding_dim}").detach())
+            if os.path.exists(f"../../weights/embedding_weights_{embedding_dim}"):
+                self.embed = nn.Embedding.from_pretrained(torch.load(f"../../weights/embedding_weights_{embedding_dim}").detach())
+            elif os.path.exists(f"src/weights/embedding_weights_{embedding_dim}"):
+                self.embed = nn.Embedding.from_pretrained(torch.load(f"src/weights/embedding_weights_{embedding_dim}").detach())
+            else:
+                raise ValueError(f"Saved embeddings under 'src/weights/embedding_weights_{embedding_dim}' not found.")
+
         else:
             self.embed = nn.Embedding(7, embedding_dim)
         #self.embed.weight.requires_grad_(False)
@@ -148,7 +158,7 @@ class NowcastPNNDOW(nn.Module):
         to load later and allow for reproducible training runs. Usage: run model with load_embed = False,
         then use model.save_embeddings() after training and use the model with load_embed = True afterwards.
         """
-        torch.save(self.embed.weight, f"./weights/embedding_weights_{self.embedding_dim}")
+        torch.save(self.embed.weight, f".src/nowcastpnn/weights/embedding_weights_{self.embedding_dim}")
 
     def forward(self, rep_tri, dow): ## Feed forward function, takes input of shape [batch, past_units, max_delay]
         #x = x.permute(0, 2, 1) # [batch, past_units, max_delay] -> [batch, max_delay, past_units]

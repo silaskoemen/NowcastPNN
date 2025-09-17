@@ -1,7 +1,19 @@
 import torch
+import os
+import random
 import numpy as np
-import torch.nn as nn
+import mlflow
 from nowcastpnn.distributions.NegativeBinomial import NegBin
+
+
+def set_seeds(SEED):
+    torch.manual_seed(SEED)
+    np.random.seed(SEED)
+    os.environ["PYTHONHASHSEED"] = str(SEED)
+    random.seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    torch.backends.cudnn.deterministic = True
+
 
 class Sampler(object):
     r"""Base class for all Samplers.
@@ -20,6 +32,7 @@ class Sampler(object):
     def __len__(self):
         raise NotImplementedError
 
+
 class SubsetSampler(Sampler):
     r""" Sampler for PyTorch that uses a given subset of indices to sample from. Not random, to use for reproducible samplings
     on the test set.
@@ -35,9 +48,11 @@ class SubsetSampler(Sampler):
     def __len__(self):
         return len(self.indices)
 
+
 def nll(y_true, y_pred):
     nll_loss = -y_pred.log_prob(y_true)
     return nll_loss
+
 
 def hybrid_loss(y_true, y_pred):
     """ Add negative log likelihood to percentage error to encourage
@@ -45,11 +60,14 @@ def hybrid_loss(y_true, y_pred):
     """
     return nll(y_true=y_true, y_pred=y_pred) + abs(y_true - y_pred.mode)
 
+
 def mae(y_true, y_pred):
     return abs(y_true - y_pred.mode)
 
+
 def mse(y_true, y_pred):
     return (y_true - y_pred.mode).pow(2)
+
 
 def get_loss(y_true, y_pred, loss_fct):
     match loss_fct:
@@ -63,20 +81,11 @@ def get_loss(y_true, y_pred, loss_fct):
             return mse(y_true, y_pred)
     raise ValueError(f"Loss function {loss_fct} not supported. Choose one of hybrid, nll, mse or mae.")
 
-def process_preds_observed(dist_pred, num_obs):
-    """ Function to include information about the number of cases already observed.
-    Any predicted values below this lower bound will be set to the lower bound
-
-    Args:
-        dist_pred[torch.tensor]: tensor of dimension (batch)
-    """
-
-
 
 def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct = "nll", device = torch.device("mps"), dow = False, num_obs = False):
     model.to(device)
     model.float()
-    optimizer = torch.optim.Adam(model.parameters(), lr = 0.0003, weight_decay=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr = 0.0003, weight_decay=1e-3)  # type: ignore
     early_stopper.reset() # set counter to zero if same instance used for multiple training runs
     for e in range(num_epochs):
         batch_loss = 0.
@@ -97,7 +106,7 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
 
             ## Check for inf or nan gradients - stop updates in that case
             valid_gradients = True
-            for name, param in model.named_parameters():
+            for _, param in model.named_parameters():
                 if param.grad is not None:
                     # valid_gradients = not (torch.isnan(param.grad).any() or torch.isinf(param.grad).any())
                     #print(f"{name} - Gradient NaNs: {torch.isnan(param.grad).any()} - Max Gradient: {param.grad.abs().max()}")
@@ -134,3 +143,12 @@ def train(model, num_epochs, train_loader, val_loader, early_stopper, loss_fct =
         model.train()
         #if e % 50 == 0 or e == num_epochs-1:
         print(f"Epoch {e+1} - Train loss: {batch_loss:.3} - Val loss: {test_batch_loss:.3} - ES count: {early_stopper.get_count()}")
+
+
+def mlflow_log_metrics(metric_dict):
+    for score in ['pica', 'wis']:
+        mlflow.log_metric(score, metric_dict[score])
+    for i, p in enumerate(['under', 'spread', 'over', 'total']):
+        mlflow.log_metric(f'wis_{p}', metric_dict['is'][i])
+    for k, v in metric_dict['coverages'].items():
+        mlflow.log_metric(f'coverage_{k}', v)

@@ -1,6 +1,5 @@
 import numpy as np
-import torch
-from torch.utils.data import Subset, DataLoader
+import logging
 import json
 import pickle
 
@@ -90,7 +89,7 @@ def IS(levels: list[float], intervals: dict, y: np.ndarray): #Y NOT PREDS
         over_pen = 2/(1-l)*np.sum(y[over_mask] - upper[over_mask])/len(y) if not np.all(over_mask == False) else 0
         is_scores[i] = np.mean(upper - lower) + under_pen + over_pen
     score = np.mean(is_scores) # this is average interval score
-    print(f"IS: {score}")
+    logging.info(f"IS: {score}")
     return score
 
 def WIS(levels: list[float], intervals: dict, y: np.ndarray, pred_med: np.ndarray):
@@ -107,7 +106,7 @@ def WIS(levels: list[float], intervals: dict, y: np.ndarray, pred_med: np.ndarra
         over_pen = 2/(1-l)*np.sum(y[over_mask] - upper[over_mask])/len(y) if not np.all(over_mask == False) else 0
         wis_scores[i] = l/2 * (np.mean(upper - lower) + under_pen + over_pen) # include weight for final calculation
     score = 1/(len(levels)+0.5)*(0.5*np.mean(abs(y - pred_med)) + np.sum(wis_scores))
-    print(f"WIS: {score}")
+    logging.info(f"WIS: {score}")
     return score
 
 def IS_decomposed(levels: list[float], intervals: dict, y: np.ndarray):
@@ -129,7 +128,7 @@ def IS_decomposed(levels: list[float], intervals: dict, y: np.ndarray):
         is_scores[2, i] = over_pred
         is_scores[3, i] = np.mean(upper - lower) + over_pred + under_pred
     is_scores = np.mean(is_scores, axis = 1)
-    print(f"IS: under = {is_scores[0]} | spread = {is_scores[1]} | over = {is_scores[2]} | total = {is_scores[3]}")
+    logging.info(f"IS: under = {is_scores[0]} | spread = {is_scores[1]} | over = {is_scores[2]} | total = {is_scores[3]}")
     return is_scores
 
 import matplotlib.pyplot as plt
@@ -148,7 +147,7 @@ def coverages(levels: list[float], intervals:dict, y:np.ndarray):
         cov = np.mean((y >= lower) & (y <= upper))
         return_dict[l] = cov
         out += f" {int(100*l)}%: {np.round(100*cov, 2)} |"
-    print(out)
+    logging.info(out)
     return return_dict
 
 def PICA(levels: list[float], intervals: dict, y: np.ndarray):
@@ -173,7 +172,7 @@ def PICA(levels: list[float], intervals: dict, y: np.ndarray):
         assert upper.shape[0] == y.shape[0], "Length of upper bounds needs to match length of predictions"
         ci_scores[i] = abs(np.mean((y >= lower) & (y <= upper)) - l)
     score = np.mean(ci_scores)
-    print(f"PICA: {score}")
+    logging.info(f"PICA: {score}")
     return score
 
 def PINAW(levels: list[float], minmaxes: tuple, intervals: dict):
@@ -220,7 +219,7 @@ def CWC(levels: list[float], minmaxes: tuple, intervals: dict, y: np.ndarray, et
         if picp < l:
             exp_scores[i] = np.exp(-eta * (picp - l))
     score = PINAW(levels, minmaxes, intervals) + np.sum(exp_scores)/len(y)
-    print(f"CWC: {score}")
+    logging.info(f"CWC: {score}")
     return score
 
 def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200, levels = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]):
@@ -230,7 +229,7 @@ def evaluate_model(model, dataset, test_loader, test_batch_size, n_samples = 200
     mat, y = next(iter(test_loader))
     mat, y = mat.to("cpu"), y.to("cpu").numpy()
     preds = np.zeros((y.shape[0], n_samples))
-    print(len(y))
+    # logging.info(len(y))
     for i in range(n_samples):
         #preds[:, i] = np.squeeze(model(mat).sample().numpy())
         preds[:, i] = model(mat).sample().numpy()

@@ -1,21 +1,24 @@
 name: "dengue_sp"
 
 # --- Data Source ---
-filepath: "data/DENGSP.csv"
-symptom_date_col: "DT_SIN_PRI"
+filepath: "data/derived/DENGSP.csv"
+reference_date_col: "DT_SIN_PRI"
 report_date_col: "DT_NOTIFIC"
 
 # --- Core Processing Parameters ---
 time_resolution: "daily"
 max_delay: 40
 past_units: 40
-train_split_perc: .75
-val_split_perc: .75
-test_set_type: "recent" # 'recent' or 'random'
+random_split: true # Whether to randomly split the data (True) or split by time (False)
 min_year: 2013 # Sanity filter for faulty date object
 max_year: 2020
 weeks: false  # Whether to use weekly aggregation (True) or daily (False)
 use_dow: true  # Whether to use day-of-week for modelling
+
+# --- PyTorch Dataloader Parameters ---
+test_split_size: .25
+val_split_size: .25
+shuffle: true
 
 # --- Feature & Label Engineering (Defaults for standard nowcast) ---
 future_obs: 0             # How many future days of observations are known (0 for standard nowcast)
@@ -28,3 +31,5 @@ output:
   return_df: false
   return_mat: false
   return_number_obs: false
+
+mlflow_run_string: "rs: ${.random_split} | dow: ${.use_dow} | ts: ${.test_split_size} | pu: ${.past_units} | md: ${.max_delay} | fo: ${.future_obs}"
