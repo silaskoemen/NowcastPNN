@@ -1,8 +1,12 @@
 name: "NowcastLSTM"
 
 params:
-  hidden_units: 30
+  hidden_size: 128
+  dropout_lstm: .00
+  num_layers: 1
+  hidden_units: [128, 64]
+  dropout_probs: [.2, .1]
   embedding_dim: 10 # This will be ignored if use_dow is false
-  loss_fct: 'nll'
+  load_embed: true
 
-mlflow_run_string: "hu${.params.hidden_units}_ed${.params.embedding_dim}_lf${.params.loss_fct}"
+mlflow_run_string: "NowcastLSTM | hs: ${.params.hidden_size} | dropl: ${.params.dropout_lstm} | nl: ${.params.num_layers} | hu: ${.params.hidden_units} | dp: ${.params.dropout_probs} | emb: ${.params.embedding_dim}"

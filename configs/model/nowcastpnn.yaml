@@ -7,4 +7,4 @@ params:
   embedding_dim: 10 # This will be ignored if use_dow is false
   dropout_probs: [.15, .1]
 
-mlflow_run_string: "NowcastPNN | hu: ${.params.hidden_units} | conv: ${.params.conv_channels} | emb: ${.params.embedding_dim} |"
+mlflow_run_string: "NowcastPNN | hu: ${.params.hidden_units} | conv: ${.params.conv_channels} | emb: ${.params.embedding_dim}"

@@ -177,12 +177,14 @@ class NowcastPNNDOW(nn.Module):
         #x = self.act(self.conv3(self.bnorm3(x)))
         #x = self.act(self.conv4(self.bnorm4(x)))
         x = torch.squeeze(x, 1)
+
         ## Addition of embedding of day of the week ##
         if len(dow.size()) == 0:
             dow = torch.unsqueeze(dow, 0)
         embedded = self.embed(dow)
         #print(embedded)
         x = x + self.act(self.fc_embed2(self.bnorm_embed(self.act(self.fc_embed1(embedded))))) # self.bnorm_embed1(embedded)
+
         ## Fully Connected Block ##
         x = self.drop1(x)
         x = self.act(self.fc3(self.bnorm5(x)))

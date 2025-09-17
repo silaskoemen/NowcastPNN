@@ -15,6 +15,7 @@
 /multirun/
 /outputs/
 /mlruns/
+/mlartifacts/
 
 /.vscode/
 

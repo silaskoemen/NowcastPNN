@@ -1,14 +1,14 @@
 defaults:
   - data: dengue_sp
-  - model: nowcastpnn  # nowcastpnn, nowcastlstm, nowcastmlp
+  - model: nowcastmlp  # nowcastpnn, nowcastlstm, nowcastmlp
   - _self_
 
 project_info:
-  experiment_name: "nowcastpnn_train"
-  run_name: "${model.mlflow_run_string} ${data.mlflow_run_string}" # Name is composed from other configs!
+  experiment_name: "train"
+  run_name: "${model.mlflow_run_string} | ${data.mlflow_run_string}" # Name is composed from other configs!
 
 training:
-  epochs: 20
+  epochs: 200
   learning_rate: 0.0003
   batch_size: 64
   patience: 30

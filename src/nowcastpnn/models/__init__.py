@@ -5,7 +5,7 @@ from torch import nn
 
 
 from .NowcastPNN import NowcastPNN, NowcastPNNDOW
-from .other_models import NowcastLSTM, NowcastMLP
+from .other_models import NowcastLSTM, NowcastLSTMDOW, NowcastMLP
 
 def get_model(cfg: DictConfig) -> nn.Module:
     """
@@ -33,7 +33,7 @@ def get_model(cfg: DictConfig) -> nn.Module:
             )
         else:
             logging.info("Data config specifies use_dow=false. Building NowcastPNN.")
-            model = NowcastPNNDOW(
+            model = NowcastPNN(
                 past_units=data_cfg.past_units,
                 max_delay=data_cfg.max_delay,
                 hidden_units=model_cfg.hidden_units,
@@ -41,13 +41,37 @@ def get_model(cfg: DictConfig) -> nn.Module:
                 dropout_probs=model_cfg.dropout_probs
             )
     elif model_name == "NowcastLSTM":
-        # You can add similar logic for your other models if they have DOW variants
-        model = NowcastLSTM(
-
-        )
+        if data_cfg.use_dow:
+            logging.info("Data config specifies use_dow=true. Building NowcastLSTMDOW.")
+            model = NowcastLSTMDOW(
+                past_units=data_cfg.past_units,
+                max_delay=data_cfg.max_delay,
+                hidden_size=model_cfg.hidden_size,
+                dropout_lstm=model_cfg.dropout_lstm,
+                hidden_units=model_cfg.hidden_units,
+                dropout_probs=model_cfg.dropout_probs,
+                embedding_dim=model_cfg.embedding_dim,
+                load_embed=model_cfg.load_embed
+            )
+        else:
+            logging.info("Data config specifies use_dow=false. Building NowcastLSTM.")
+            model = NowcastLSTM(
+                past_units=data_cfg.past_units,
+                max_delay=data_cfg.max_delay,
+                hidden_size=model_cfg.hidden_size,
+                dropout_lstm=model_cfg.dropout_lstm,
+                hidden_units=model_cfg.hidden_units,
+                dropout_probs=model_cfg.dropout_probs
+            )
     elif model_name == "NowcastMLP":
+        if data_cfg.use_dow:
+            logging.warning(f"MLP doesn't support day of the week embedding. Defaulting to standard model.")
         model = NowcastMLP(
-
+            past_units=data_cfg.past_units,
+            max_delay=data_cfg.max_delay,
+            hidden_units=model_cfg.hidden_units,
+            dropout_probs=model_cfg.dropout_probs,
+            process_in=model_cfg.process_in
         )
     else:
         raise ValueError(f"Unknown model name: {model_name}")

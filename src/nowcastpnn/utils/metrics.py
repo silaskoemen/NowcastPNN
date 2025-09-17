@@ -259,8 +259,8 @@ def pnn_PIs(model, test_loader, n_samples: int = 200, levels: list = [0.05, 0.1,
         dow_val = dow_val.to("cpu")
     mat, y = mat.to("cpu"), y.to("cpu").numpy()
     model.eval() # sets batch norm to eval so a single entry can be passed without issues of calculating mean and std and overall means and stds used
-    model.drop1.train() # keeps dropout layers active
-    model.drop2.train()
+    if hasattr(model, 'drop1'): model.drop1.train()
+    if hasattr(model, 'drop2'): model.drop2.train()
     model = model.to("cpu")
     preds = np.zeros((y.shape[0], n_samples))
     for i in range(n_samples):

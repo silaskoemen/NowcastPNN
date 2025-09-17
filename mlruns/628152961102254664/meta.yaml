@@ -1,6 +1,17 @@
 artifact_location: mlflow-artifacts:/628152961102254664
 creation_time: 1757799325726
 experiment_id: '628152961102254664'
-last_update_time: 1757799325726
+last_update_time: 1758127090717
 lifecycle_stage: active
-name: nowcastpnn_train
+name: train
+tags:
+  mlflow.note.content: 'Training runs of the NowcastPNN model
+
+
+    Logs the parameters, losses, early stopping counts, weights etc. to the MLFlow
+    run, also incorporates the param configuration in the name for easy access
+
+    '
+  mlflow.sharedViewState.3894e7dac091113a949e1a0b144bdfbf23f857b1cfb2b6251e919052fe25b155: 'deflate;eJxdUtFO4zAQ/JWTnysEr3kLpdwhWoRSqE6qTq1rb8lKjh1519Ac6r+zbgIpPO7szOx61u+KQEdT36JjiKpQaqJCtBCvu3vopNbMEXeJgS6IdeQNYwMjqSSjir12BBN16j/ldqHK+VxIDvdgOuPgy740jK9ZbzVrAqbPzvrfRDXBgltBJAx+VDj3q0qeREPgwDDYaXCpEaRYn6+3XYYUDWyFeI4usin9RG/68VslY6O4zw6t9hasKt6PPfKI3ud6PTD+oLXgx3qFhDt0yN1Ct6Osp+WhsvvtXbV82lxdbqrnh6Vs8IrwttAHbPB/th5yE9kciT8HDChSaYykLFlUcEr7TJIIfseQWrAr7RLQnZ/WEr5EwjFJv0YLs6bl7jv8kjXXclafnBvKH0/XiUMF+whUz7zeuYwPYhd22s3Rw8l0GvweX0SkDuUBqf8txNCe7u5h2YTAtQeS6Zfj7f5m8gLkEqaXqOPxA/ej5lc=
+
+    '
