@@ -1,6 +1,6 @@
 defaults:
   - data: dengue_sp
-  - model: nowcastmlp  # nowcastpnn, nowcastlstm, nowcastmlp
+  - model: nowcastpnn  # nowcastpnn, nowcastlstm, nowcastmlp
   - _self_
 
 project_info:
