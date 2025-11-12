@@ -1,0 +1,3 @@
+Training runs of the NowcastPNN model
+
+Logs the parameters, losses, early stopping counts, weights etc. to the MLFlow run, also incorporates the param configuration in the name for easy access

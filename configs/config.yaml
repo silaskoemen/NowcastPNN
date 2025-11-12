@@ -1,0 +1,19 @@
+defaults:
+  - data: dengue_sp
+  - model: nowcastpnn  # nowcastpnn, nowcastlstm, nowcastmlp
+  - _self_
+
+project_info:
+  experiment_name: "train"
+  run_name: "${model.mlflow_run_string} | ${data.mlflow_run_string}" # Name is composed from other configs!
+
+training:
+  epochs: 200
+  learning_rate: 0.0003
+  batch_size: 64
+  patience: 30
+  device: 'mps' # 'cpu', 'cuda', or 'mps' (for Apple silicon)
+  loss_fct: 'nll'
+  return_history: true
+
+seed: 1234

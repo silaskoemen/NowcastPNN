@@ -30,9 +30,19 @@ The outputs folder contains the results of the analyses. The subdirectory [figur
 
 To run this project locally, follow these steps:
 
-1. Clone the repository: git clone https://github.com/silaskoemen/NowcastPNN.git
-2. Navigate to the project directory: cd NowcastPNN
-3. Install required packages (preferably in a virtual environment to avoid conflicts): pip install -r requirements.txt OR pip3 install -r requirements.txt
+1. Clone the repository: `git clone https://github.com/silaskoemen/NowcastPNN.git`
+2. Navigate to the project directory with `cd NowcastPNN`
+3. Run the setup command from the project root:
+
+    ```bash
+    make setup
+    ```
+
+4.  Activate the environment:
+
+    ```bash
+    micromamba activate nowcastpnn
+    ```
 
 ## Usage
 
@@ -52,4 +62,3 @@ Contributions are welcome. Please feel free to submit a pull request or open an 
 ## License
 
 This project is licensed under the [CC-BY-4.0](LICENSE) License.
-      

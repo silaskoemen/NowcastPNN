@@ -7,3 +7,16 @@
 
 **/.RData
 .RData
+
+/*.egg-info # pixi environments
+.pixi/*
+!.pixi/config.toml
+
+/multirun/
+/outputs/
+/mlruns/
+/mlartifacts/
+
+/.vscode/
+
+*/__pycache/

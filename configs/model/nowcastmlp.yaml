@@ -1,0 +1,8 @@
+name: "NowcastMLP"
+
+params:
+  hidden_units: [128, 64]
+  dropout_probs: [.3, .1]
+  process_in: 'sum'  # 'sum' along max_delay or 'stack' for flattening
+
+mlflow_run_string: "NowcastMLP | hu: ${.params.hidden_units} | dp: ${.params.dropout_probs} | pi: ${.params.process_in}"

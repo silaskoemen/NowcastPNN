@@ -1,0 +1,23 @@
+artifact_path: mlflow-artifacts:/628152961102254664/models/m-2fea6112baa848f8be82a22604054061/artifacts
+flavors:
+  python_function:
+    config:
+      device: null
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pytorch
+    pickle_module_name: mlflow.pytorch.pickle_module
+    python_version: 3.11.13
+  pytorch:
+    code: null
+    model_data: data
+    pytorch_version: 2.4.0
+mlflow_version: 3.2.0
+model_id: m-2fea6112baa848f8be82a22604054061
+model_size_bytes: 81003
+model_uuid: m-2fea6112baa848f8be82a22604054061
+prompts: null
+run_id: 508ce142822d4ec5b7f1ca3ceed73fca
+utc_time_created: '2025-09-17 15:06:30.453917'
